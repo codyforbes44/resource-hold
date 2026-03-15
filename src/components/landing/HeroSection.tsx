@@ -148,7 +148,7 @@ const HeroSection = () => {
         >
           <Button size="lg" className="glow-cycle-brand gap-2 px-6 text-sm btn-hover-glow sm:px-8 sm:text-base" asChild>
             <Link to="/chat">
-              Launch gClaw
+              Launch &gt; gClaw
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>

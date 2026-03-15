@@ -20,7 +20,7 @@ const ComparisonCard = ({ row }: { row: typeof COMPARISON_DATA[0] }) => (
         <div key={key} className="flex flex-col items-center gap-1">
           <StatusIcon status={row[key]} />
           <span className={`text-xs ${key === "gclaw" ? "font-bold text-primary" : "text-muted-foreground"}`}>
-            {key === "gclaw" ? "gClaw" : key === "openclaw" ? "OpenClaw" : "NemoClaw"}
+            {key === "gclaw" ? "> gClaw" : key === "openclaw" ? "OpenClaw" : "NemoClaw"}
           </span>
         </div>
       ))}
