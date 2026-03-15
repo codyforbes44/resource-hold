@@ -58,7 +58,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary"
+          className="mb-8 inline-flex items-center gap-2 rounded-full border border-cycle-brand bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary"
         >
           <Zap className="h-3.5 w-3.5" />
           Open-Source · Hardware Agnostic · Enterprise Ready
@@ -72,7 +72,7 @@ const HeroSection = () => {
           className="mx-auto max-w-4xl font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl"
         >
           Enterprise AI Agents,{" "}
-          <span className="text-gradient-brand">Redefined</span>
+          <span className="text-cycle-brand">Redefined</span>
         </motion.h1>
 
         {/* Subheadline */}
@@ -94,7 +94,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
         >
-          <Button size="lg" className="glow-brand gap-2 px-8 text-base btn-hover-glow" asChild>
+          <Button size="lg" className="glow-cycle-brand gap-2 px-8 text-base btn-hover-glow" asChild>
             <Link to="/chat">
               Launch gClaw
               <ArrowRight className="h-4 w-4" />
@@ -111,7 +111,7 @@ const HeroSection = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="mx-auto mt-16 grid max-w-2xl grid-cols-3 gap-8 border-t border-border/50 pt-10"
+          className="mx-auto mt-16 grid max-w-2xl grid-cols-3 gap-8 border-t border-cycle-brand pt-10"
         >
           {HERO_STATS.map((stat) => (
             <AnimatedCounter key={stat.label} value={stat.value} label={stat.label} />
