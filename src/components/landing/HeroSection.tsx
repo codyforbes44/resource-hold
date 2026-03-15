@@ -146,13 +146,13 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4"
         >
-          <Button size="lg" className="glow-cycle-brand gap-2 px-8 text-base btn-hover-glow" asChild>
+          <Button size="lg" className="glow-cycle-brand gap-2 px-6 text-sm btn-hover-glow sm:px-8 sm:text-base" asChild>
             <Link to="/chat">
               Launch gClaw
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="outline" size="lg" className="gap-2 border-border px-8 text-base">
+          <Button variant="outline" size="lg" className="gap-2 border-border px-6 text-sm sm:px-8 sm:text-base">
             <Github className="h-4 w-4" />
             View on GitHub
           </Button>
