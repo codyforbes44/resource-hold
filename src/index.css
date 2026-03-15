@@ -159,6 +159,11 @@
   75% { border-color: hsl(var(--gclaw-red) / 0.4); }
 }
 
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
