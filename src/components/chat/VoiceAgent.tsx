@@ -95,8 +95,26 @@ const VoiceAgent = () => {
     if (conversation.status !== "connected") return;
 
     const poll = () => {
-      setInputLevel(conversation.getInputVolume?.() ?? 0);
-      setOutputLevel(conversation.getOutputVolume?.() ?? 0);
+      const inVol = conversation.getInputVolume?.() ?? 0;
+      const outVol = conversation.getOutputVolume?.() ?? 0;
+      setInputLevel(inVol);
+      setOutputLevel(outVol);
+
+      // Track signal quality based on audio flow
+      if (inVol < 0.01 && outVol < 0.01) {
+        silenceCountRef.current++;
+      } else {
+        silenceCountRef.current = 0;
+      }
+      // ~3s of total silence at 60fps = ~180 frames
+      if (silenceCountRef.current > 300) {
+        setSignalQuality("poor");
+      } else if (silenceCountRef.current > 120) {
+        setSignalQuality("fair");
+      } else {
+        setSignalQuality("good");
+      }
+
       animFrameRef.current = requestAnimationFrame(poll);
     };
     animFrameRef.current = requestAnimationFrame(poll);
