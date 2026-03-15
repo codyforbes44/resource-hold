@@ -79,8 +79,8 @@ const AnimatedCounter = ({ value, label }: { value: string; label: string }) => 
 
   return (
     <div ref={ref}>
-      <div className="font-display text-3xl font-bold text-primary">{display}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+      <div className="font-display text-2xl font-bold text-primary sm:text-3xl">{display}</div>
+      <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{label}</div>
     </div>
   );
 };
