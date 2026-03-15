@@ -46,7 +46,8 @@ const HeroSection = () => {
     <section className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
       {/* Animated gradient mesh background */}
       <div className="absolute inset-0 -z-10">
-        <div className="hero-mesh absolute inset-0 opacity-30" />
+        <img src={heroBg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute top-1/3 right-1/4 h-[300px] w-[300px] rounded-full bg-gclaw-red/5 blur-[100px]" />
       </div>
