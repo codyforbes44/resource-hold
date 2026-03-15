@@ -132,7 +132,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl"
+          className="mx-auto mt-4 max-w-2xl px-2 text-sm leading-relaxed text-muted-foreground sm:mt-6 sm:px-0 sm:text-base md:text-lg lg:text-xl"
         >
           gClaw is a multi-provider, hardware-agnostic AI agent platform built on NVIDIA NeMo
           and the OpenClaw ecosystem. Deploy voice, multimodal, and autonomous agents with
