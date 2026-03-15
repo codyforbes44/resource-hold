@@ -289,7 +289,9 @@ const Chat = () => {
         </div>
 
         {showVoice ? (
-          <VoiceAgent />
+          <VoiceAgent userId={user!.id} onConversationSaved={(conv) => {
+            setConversations((prev) => [conv, ...prev]);
+          }} />
         ) : (
           <>
             {/* Messages */}
