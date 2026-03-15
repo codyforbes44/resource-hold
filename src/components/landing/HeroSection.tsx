@@ -42,11 +42,18 @@ const AnimatedCounter = ({ value, label }: { value: string; label: string }) => 
 };
 
 const HeroSection = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+  const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+
   return (
-    <section className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
-      {/* Animated gradient mesh background */}
-      <div className="absolute inset-0 -z-10">
-        <img src={heroBg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+    <section ref={sectionRef} className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
+      {/* Parallax background */}
+      <motion.div className="absolute inset-0 -z-10" style={{ y: bgY }}>
+        <img src={heroBg} alt="" aria-hidden="true" className="absolute inset-0 h-[130%] w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute top-1/3 right-1/4 h-[300px] w-[300px] rounded-full bg-gclaw-red/5 blur-[100px]" />
