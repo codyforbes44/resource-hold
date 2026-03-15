@@ -22,10 +22,15 @@ const VoiceAgent = () => {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [inputLevel, setInputLevel] = useState(0);
   const [outputLevel, setOutputLevel] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [signalQuality, setSignalQuality] = useState<"good" | "fair" | "poor">("good");
   const animFrameRef = useRef<number>(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const prevVolumeRef = useRef(80);
   const entryIdRef = useRef(0);
+  const connectedAtRef = useRef<number>(0);
+  const silenceCountRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   const conversation = useConversation({
     onConnect: () => toast.success("Voice agent connected"),
