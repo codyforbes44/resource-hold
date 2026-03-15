@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Phone, PhoneOff, Volume2, VolumeX } from "lucide-react";
+import { Phone, PhoneOff, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type TranscriptEntry = {
@@ -22,18 +22,34 @@ const VoiceAgent = () => {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [inputLevel, setInputLevel] = useState(0);
   const [outputLevel, setOutputLevel] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [signalQuality, setSignalQuality] = useState<"good" | "fair" | "poor">("good");
   const animFrameRef = useRef<number>(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const prevVolumeRef = useRef(80);
   const entryIdRef = useRef(0);
+  const connectedAtRef = useRef<number>(0);
+  const silenceCountRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   const conversation = useConversation({
-    onConnect: () => toast.success("Voice agent connected"),
+    onConnect: () => {
+      toast.success("Voice agent connected");
+      connectedAtRef.current = Date.now();
+      setElapsed(0);
+      silenceCountRef.current = 0;
+      setSignalQuality("good");
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - connectedAtRef.current) / 1000));
+      }, 1000);
+    },
     onDisconnect: () => {
       toast.info("Voice agent disconnected");
       cancelAnimationFrame(animFrameRef.current);
+      clearInterval(timerRef.current);
       setInputLevel(0);
       setOutputLevel(0);
+      setElapsed(0);
     },
     onError: (error) => {
       console.error("Voice agent error:", error);
@@ -79,8 +95,26 @@ const VoiceAgent = () => {
     if (conversation.status !== "connected") return;
 
     const poll = () => {
-      setInputLevel(conversation.getInputVolume?.() ?? 0);
-      setOutputLevel(conversation.getOutputVolume?.() ?? 0);
+      const inVol = conversation.getInputVolume?.() ?? 0;
+      const outVol = conversation.getOutputVolume?.() ?? 0;
+      setInputLevel(inVol);
+      setOutputLevel(outVol);
+
+      // Track signal quality based on audio flow
+      if (inVol < 0.01 && outVol < 0.01) {
+        silenceCountRef.current++;
+      } else {
+        silenceCountRef.current = 0;
+      }
+      // ~3s of total silence at 60fps = ~180 frames
+      if (silenceCountRef.current > 300) {
+        setSignalQuality("poor");
+      } else if (silenceCountRef.current > 120) {
+        setSignalQuality("fair");
+      } else {
+        setSignalQuality("good");
+      }
+
       animFrameRef.current = requestAnimationFrame(poll);
     };
     animFrameRef.current = requestAnimationFrame(poll);
@@ -160,8 +194,36 @@ const VoiceAgent = () => {
   const outputScale = 1 + outputLevel * 0.6;
   const isActive = conversation.status === "connected";
 
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const qualityColor =
+    signalQuality === "good"
+      ? "bg-green-500"
+      : signalQuality === "fair"
+        ? "bg-yellow-500"
+        : "bg-destructive";
+
+  const qualityLabel =
+    signalQuality === "good" ? "Strong" : signalQuality === "fair" ? "Fair" : "Weak";
+
   return (
     <div className="flex flex-1 flex-col items-center gap-4 p-6">
+      {/* Connection Quality Indicator */}
+      {isActive && (
+        <div className="flex items-center gap-3 rounded-full border border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Wifi className="h-3.5 w-3.5" />
+            <span className={`inline-block h-2 w-2 rounded-full ${qualityColor}`} />
+            <span>{qualityLabel}</span>
+          </div>
+          <span className="text-border">|</span>
+          <span className="tabular-nums">{formatTime(elapsed)}</span>
+        </div>
+      )}
       {/* Visualization Orb */}
       <div className="relative flex items-center justify-center py-8">
         {/* Outer ring — output (agent speaking) */}
