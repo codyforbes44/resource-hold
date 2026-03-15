@@ -1,5 +1,6 @@
 import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
+import { Badge } from "@/components/ui/badge";
 import OverviewSection from "@/components/landing/OverviewSection";
 import FeaturesGrid from "@/components/landing/FeaturesGrid";
 import PartnersSection from "@/components/landing/PartnersSection";
