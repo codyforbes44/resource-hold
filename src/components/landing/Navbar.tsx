@@ -119,8 +119,8 @@ const Navbar = () => {
                   {link.label}
                 </a>
               ))}
-              <Button size="sm" className="mt-2 glow-brand">
-                Get Started
+              <Button size="sm" className="mt-2 glow-brand" asChild>
+                <Link to="/chat">Get Started</Link>
               </Button>
             </div>
           </motion.div>
