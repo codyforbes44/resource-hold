@@ -39,9 +39,9 @@ const VoiceAgent = () => {
       console.error("Voice agent error:", error);
       toast.error("Voice agent connection error");
     },
-    onMessage: (message) => {
+    onMessage: (message: any) => {
       if (message.type === "user_transcript") {
-        const text = (message as any).user_transcription_event?.user_transcript;
+        const text = message.user_transcription_event?.user_transcript;
         if (text) {
           setTranscript((prev) => [
             ...prev,
@@ -49,7 +49,7 @@ const VoiceAgent = () => {
           ]);
         }
       } else if (message.type === "agent_response") {
-        const text = (message as any).agent_response_event?.agent_response;
+        const text = message.agent_response_event?.agent_response;
         if (text) {
           setTranscript((prev) => [
             ...prev,
@@ -57,15 +57,17 @@ const VoiceAgent = () => {
           ]);
         }
       } else if (message.type === "agent_response_correction") {
-        const corrected = (message as any).agent_response_correction_event?.corrected_agent_response;
+        const corrected = message.agent_response_correction_event?.corrected_agent_response;
         if (corrected) {
           setTranscript((prev) => {
-            const last = [...prev];
-            const lastAgent = last.findLastIndex((e) => e.role === "agent");
-            if (lastAgent !== -1) {
-              last[lastAgent] = { ...last[lastAgent], text: corrected };
+            const updated = [...prev];
+            for (let i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].role === "agent") {
+                updated[i] = { ...updated[i], text: corrected };
+                break;
+              }
             }
-            return last;
+            return updated;
           });
         }
       }
