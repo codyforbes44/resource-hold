@@ -46,9 +46,9 @@ const Navbar = () => {
     >
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-2 font-display text-xl font-bold">
+        <a href="#" className="flex items-center gap-2 text-xl font-bold">
           <img src={logoGclaw} alt="gClaw logo" className="h-8 w-8 rounded-lg" />
-          <span><span className="text-foreground">g</span><span className="text-gradient-brand">Claw</span></span>
+          <span className="font-mono tracking-tight"><span className="text-foreground">g</span><span className="text-gradient-brand">Claw</span></span>
         </a>
 
         {/* Desktop links */}
