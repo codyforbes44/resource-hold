@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
@@ -81,8 +82,8 @@ const Navbar = () => {
           <Button variant="ghost" size="sm" className="text-muted-foreground">
             Docs
           </Button>
-          <Button size="sm" className="glow-brand">
-            Get Started
+          <Button size="sm" className="glow-brand" asChild>
+            <Link to="/chat">Get Started</Link>
           </Button>
         </div>
 
@@ -118,8 +119,8 @@ const Navbar = () => {
                   {link.label}
                 </a>
               ))}
-              <Button size="sm" className="mt-2 glow-brand">
-                Get Started
+              <Button size="sm" className="mt-2 glow-brand" asChild>
+                <Link to="/chat">Get Started</Link>
               </Button>
             </div>
           </motion.div>
