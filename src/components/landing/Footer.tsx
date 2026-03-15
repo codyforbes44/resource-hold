@@ -7,7 +7,7 @@ const Footer = () => {
       <div className="container">
         <div className="flex flex-col items-center gap-6 md:flex-row md:justify-between">
           <div className="flex items-center text-lg font-bold">
-            <span className="font-mono tracking-tight"><span>g</span><span className="text-gradient-brand">Claw</span></span>
+            <span className="font-mono tracking-tight"><span>g</span><span className="text-gradient-brand">Claw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" /></span>
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
