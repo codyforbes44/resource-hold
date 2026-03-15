@@ -163,7 +163,7 @@ const HeroSection = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="mx-auto mt-16 grid max-w-2xl grid-cols-3 gap-8 border-t border-cycle-brand pt-10"
+          className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-4 border-t border-cycle-brand pt-8 sm:mt-16 sm:gap-8 sm:pt-10"
         >
           {HERO_STATS.map((stat) => (
             <AnimatedCounter key={stat.label} value={stat.value} label={stat.label} />
