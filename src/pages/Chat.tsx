@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Send, Trash2, LogOut, Mic, Home } from "lucide-react";
+import { Plus, Send, Trash2, LogOut, Mic, Home, PanelLeftClose, PanelLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import VoiceAgent from "@/components/chat/VoiceAgent";
 import logoSrc from "@/assets/logo-gclaw.png";
@@ -41,12 +41,24 @@ const Chat = () => {
   const [model, setModel] = useState(MODELS[0].value);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
   }, [user, authLoading, navigate]);
+
+  // Auto-close sidebar on mobile
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) setSidebarOpen(false);
+    };
+    handler(mq);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   // Load conversations
   useEffect(() => {
@@ -107,6 +119,12 @@ const Chat = () => {
       setActiveConv(null);
       setMessages([]);
     }
+  };
+
+  const selectConversation = (id: string) => {
+    setActiveConv(id);
+    // Close sidebar on mobile after selecting
+    if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
   const send = useCallback(async () => {
@@ -228,11 +246,32 @@ const Chat = () => {
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="flex w-64 flex-col border-r border-border bg-card">
-        <div className="flex items-center gap-2 border-b border-border p-4">
-          <img src={logoSrc} alt="gClaw" className="h-6 w-6" />
-          <span className="font-display font-bold">gClaw Chat</span>
+      <div
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 ease-in-out md:relative md:z-auto md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:-translate-x-full md:hidden"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <div className="flex items-center gap-2">
+            <img src={logoSrc} alt="gClaw" className="h-6 w-6" />
+            <span className="font-display font-bold">gClaw Chat</span>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Close sidebar"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
         </div>
         <div className="p-2">
           <Button variant="outline" className="w-full justify-start gap-2" onClick={createConversation}>
@@ -246,7 +285,7 @@ const Chat = () => {
               className={`group mb-1 flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
                 activeConv === c.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
               }`}
-              onClick={() => setActiveConv(c.id)}
+              onClick={() => selectConversation(c.id)}
             >
               <span className="truncate">{c.title}</span>
               <button
@@ -269,11 +308,20 @@ const Chat = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-w-0">
         {/* Top Bar */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2 md:px-4">
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Open sidebar"
+            >
+              <PanelLeft className="h-5 w-5" />
+            </button>
+          )}
           <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[160px] md:w-[200px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -282,9 +330,10 @@ const Chat = () => {
               ))}
             </SelectContent>
           </Select>
+          <div className="flex-1" />
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowVoice(!showVoice)}>
             <Mic className="h-4 w-4" />
-            {showVoice ? "Hide Voice" : "Voice Agent"}
+            <span className="hidden sm:inline">{showVoice ? "Hide Voice" : "Voice Agent"}</span>
           </Button>
         </div>
 
@@ -295,9 +344,9 @@ const Chat = () => {
         ) : (
           <>
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-3 md:p-4">
               {messages.length === 0 && (
-                <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                <div className="flex h-full flex-col items-center justify-center gap-4 text-center px-4">
                   <img src={logoSrc} alt="gClaw" className="h-16 w-16 opacity-30" />
                   <p className="text-lg text-muted-foreground">Start a conversation with gClaw</p>
                   <p className="max-w-md text-sm text-muted-foreground/60">
@@ -308,7 +357,7 @@ const Chat = () => {
               {messages.map((msg, i) => (
                 <div key={i} className={`mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[80%] rounded-xl px-4 py-3 text-sm ${
+                    className={`max-w-[90%] md:max-w-[80%] rounded-xl px-4 py-3 text-sm ${
                       msg.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-foreground"
@@ -328,7 +377,7 @@ const Chat = () => {
             </ScrollArea>
 
             {/* Input */}
-            <div className="border-t border-border p-4">
+            <div className="border-t border-border p-3 md:p-4">
               <form
                 onSubmit={(e) => { e.preventDefault(); send(); }}
                 className="flex gap-2"
