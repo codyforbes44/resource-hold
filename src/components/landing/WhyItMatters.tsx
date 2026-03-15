@@ -6,7 +6,7 @@ const WhyItMatters = () => {
   return (
     <SectionWrapper>
       <SectionHeader description="A full-stack AI agent strategy across three critical layers — from silicon to software.">
-        Why <span className="text-gradient-brand">gClaw</span> Matters
+        Why <span className="text-gradient-brand">gClaw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" /> Matters
       </SectionHeader>
 
       <div className="mx-auto mt-16 grid max-w-4xl gap-6 md:grid-cols-3">
