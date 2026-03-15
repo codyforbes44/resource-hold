@@ -41,7 +41,7 @@ const ComparisonTable = () => {
           <TableHeader>
             <TableRow className="border-border/50 bg-card hover:bg-card">
               <TableHead className="w-[200px] text-foreground">Feature</TableHead>
-              <TableHead className="text-center font-display font-bold text-primary">gClaw</TableHead>
+              <TableHead className="text-center font-display font-bold text-primary">&gt; gClaw</TableHead>
               <TableHead className="text-center text-muted-foreground">OpenClaw</TableHead>
               <TableHead className="text-center text-muted-foreground">NemoClaw</TableHead>
             </TableRow>
