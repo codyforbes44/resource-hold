@@ -6,8 +6,7 @@ const Footer = () => {
     <footer className="border-t border-border/30 py-12">
       <div className="container">
         <div className="flex flex-col items-center gap-6 md:flex-row md:justify-between">
-          <div className="flex items-center gap-2 text-lg font-bold">
-            <img src={logoGclaw} alt="gClaw logo" className="h-7 w-7 rounded-md" />
+          <div className="flex items-center text-lg font-bold">
             <span className="font-mono tracking-tight"><span>g</span><span className="text-gradient-brand">Claw</span></span>
           </div>
 
