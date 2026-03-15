@@ -9,7 +9,7 @@ const FAQSection = () => {
   return (
     <SectionWrapper id="faq">
       <SectionHeader>
-        Frequently Asked <span className="text-gradient-green">Questions</span>
+        Frequently Asked <span className="text-gradient-brand">Questions</span>
       </SectionHeader>
 
       <div className="mx-auto mt-12 max-w-2xl">

@@ -6,7 +6,7 @@ const RoadmapTimeline = () => {
   return (
     <SectionWrapper id="roadmap">
       <SectionHeader description="Our path from open-source foundation to enterprise-ready AI agent platform.">
-        <span className="text-gradient-green">Roadmap</span>
+        <span className="text-gradient-brand">Roadmap</span>
       </SectionHeader>
 
       <div className="mx-auto mt-16 max-w-2xl">

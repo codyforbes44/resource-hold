@@ -46,7 +46,7 @@ const HeroSection = () => {
       <div className="absolute inset-0 -z-10">
         <div className="hero-mesh absolute inset-0 opacity-30" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute top-1/3 right-1/4 h-[300px] w-[300px] rounded-full bg-gbot-blue/5 blur-[100px]" />
+        <div className="absolute top-1/3 right-1/4 h-[300px] w-[300px] rounded-full bg-gclaw-red/5 blur-[100px]" />
       </div>
 
       <div className="container text-center">
@@ -69,7 +69,7 @@ const HeroSection = () => {
           className="mx-auto max-w-4xl font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl"
         >
           Enterprise AI Agents,{" "}
-          <span className="text-gradient-green">Redefined</span>
+          <span className="text-gradient-brand">Redefined</span>
         </motion.h1>
 
         {/* Subheadline */}
@@ -79,7 +79,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl"
         >
-          gBot is a multi-provider, hardware-agnostic AI agent platform built on NVIDIA NeMo
+          gClaw is a multi-provider, hardware-agnostic AI agent platform built on NVIDIA NeMo
           and the OpenClaw ecosystem. Deploy voice, multimodal, and autonomous agents with
           enterprise-grade security — on any hardware.
         </motion.p>
@@ -91,8 +91,8 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
         >
-          <Button size="lg" className="glow-green gap-2 px-8 text-base btn-hover-glow">
-            Launch gBot
+          <Button size="lg" className="glow-brand gap-2 px-8 text-base btn-hover-glow">
+            Launch gClaw
             <ArrowRight className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="lg" className="gap-2 border-border px-8 text-base">

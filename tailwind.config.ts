@@ -61,12 +61,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        gbot: {
-          green: "hsl(var(--gbot-green))",
-          blue: "hsl(var(--gbot-blue))",
-          surface: "hsl(var(--gbot-surface))",
-          "surface-light": "hsl(var(--gbot-surface-light))",
-          glow: "hsl(var(--gbot-glow))",
+        gclaw: {
+          red: "hsl(var(--gclaw-red))",
+          blue: "hsl(var(--gclaw-blue))",
+          yellow: "hsl(var(--gclaw-yellow))",
+          green: "hsl(var(--gclaw-green))",
+          surface: "hsl(var(--gclaw-surface))",
+          "surface-light": "hsl(var(--gclaw-surface-light))",
         },
       },
       borderRadius: {
