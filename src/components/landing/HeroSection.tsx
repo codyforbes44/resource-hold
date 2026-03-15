@@ -94,7 +94,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
         >
-          <Button size="lg" className="glow-brand gap-2 px-8 text-base btn-hover-glow" asChild>
+          <Button size="lg" className="glow-cycle-brand gap-2 px-8 text-base btn-hover-glow" asChild>
             <Link to="/chat">
               Launch gClaw
               <ArrowRight className="h-4 w-4" />
