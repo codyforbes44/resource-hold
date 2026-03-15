@@ -79,8 +79,8 @@ const AnimatedCounter = ({ value, label }: { value: string; label: string }) => 
 
   return (
     <div ref={ref}>
-      <div className="font-display text-3xl font-bold text-primary">{display}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+      <div className="font-display text-2xl font-bold text-primary sm:text-3xl">{display}</div>
+      <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{label}</div>
     </div>
   );
 };
@@ -94,7 +94,7 @@ const HeroSection = () => {
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
   return (
-    <section ref={sectionRef} className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
+    <section ref={sectionRef} className="relative overflow-hidden pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
       {/* Parallax background */}
       <motion.div className="absolute inset-0 -z-10" style={{ y: bgY }}>
         <img src={heroBg} alt="" aria-hidden="true" className="absolute inset-0 h-[130%] w-full object-cover" />
@@ -110,7 +110,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-cycle-brand bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary"
+          className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-cycle-brand bg-primary/10 px-3 py-1 text-xs font-medium text-primary sm:mb-8 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-sm"
         >
           <Zap className="h-3.5 w-3.5" />
           Open-Source · Hardware Agnostic · Enterprise Ready
@@ -121,7 +121,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="mx-auto max-w-4xl font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl"
+          className="mx-auto max-w-4xl font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl lg:text-7xl"
         >
           Enterprise AI Agents,{" "}
           <span className="text-cycle-brand">Redefined</span>
@@ -132,7 +132,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl"
+          className="mx-auto mt-4 max-w-2xl px-2 text-sm leading-relaxed text-muted-foreground sm:mt-6 sm:px-0 sm:text-base md:text-lg lg:text-xl"
         >
           gClaw is a multi-provider, hardware-agnostic AI agent platform built on NVIDIA NeMo
           and the OpenClaw ecosystem. Deploy voice, multimodal, and autonomous agents with
@@ -144,15 +144,15 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+          className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4"
         >
-          <Button size="lg" className="glow-cycle-brand gap-2 px-8 text-base btn-hover-glow" asChild>
+          <Button size="lg" className="glow-cycle-brand gap-2 px-6 text-sm btn-hover-glow sm:px-8 sm:text-base" asChild>
             <Link to="/chat">
               Launch gClaw
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="outline" size="lg" className="gap-2 border-border px-8 text-base">
+          <Button variant="outline" size="lg" className="gap-2 border-border px-6 text-sm sm:px-8 sm:text-base">
             <Github className="h-4 w-4" />
             View on GitHub
           </Button>
@@ -163,7 +163,7 @@ const HeroSection = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="mx-auto mt-16 grid max-w-2xl grid-cols-3 gap-8 border-t border-cycle-brand pt-10"
+          className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-4 border-t border-cycle-brand pt-8 sm:mt-16 sm:gap-8 sm:pt-10"
         >
           {HERO_STATS.map((stat) => (
             <AnimatedCounter key={stat.label} value={stat.value} label={stat.label} />
