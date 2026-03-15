@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Bot } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { NAV_LINKS } from "@/constants/landing";
+import logoGclaw from "@/assets/logo-gclaw.png";
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -13,7 +14,6 @@ const Navbar = () => {
     const onScroll = () => {
       setScrolled(window.scrollY > 20);
 
-      // Active section detection
       const sections = NAV_LINKS.map((l) => l.href.slice(1));
       for (let i = sections.length - 1; i >= 0; i--) {
         const el = document.getElementById(sections[i]);
@@ -46,11 +46,9 @@ const Navbar = () => {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <a href="#" className="flex items-center gap-2 font-display text-xl font-bold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Bot className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src={logoGclaw} alt="gClaw logo" className="h-8 w-8 rounded-lg" />
           <span className="text-foreground">g</span>
-          <span className="text-gradient-green">Bot</span>
+          <span className="text-gradient-brand">Claw</span>
         </a>
 
         {/* Desktop links */}
@@ -83,7 +81,7 @@ const Navbar = () => {
           <Button variant="ghost" size="sm" className="text-muted-foreground">
             Docs
           </Button>
-          <Button size="sm" className="glow-green">
+          <Button size="sm" className="glow-brand">
             Get Started
           </Button>
         </div>
@@ -120,7 +118,7 @@ const Navbar = () => {
                   {link.label}
                 </a>
               ))}
-              <Button size="sm" className="mt-2 glow-green">
+              <Button size="sm" className="mt-2 glow-brand">
                 Get Started
               </Button>
             </div>

@@ -6,7 +6,7 @@ const FeaturesGrid = () => {
   return (
     <SectionWrapper id="features">
       <SectionHeader description="Every feature designed for enterprise deployment — from model selection to security compliance.">
-        Built for <span className="text-gradient-green">Production</span>
+        Built for <span className="text-gradient-brand">Production</span>
       </SectionHeader>
 
       <div className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-border/50 bg-border/50 sm:grid-cols-2 lg:grid-cols-3">

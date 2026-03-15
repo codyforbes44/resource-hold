@@ -26,7 +26,7 @@ export interface Pillar {
 
 export const PILLARS: Pillar[] = [
   { icon: Shield, title: "Enterprise Security", desc: "Multi-layer authentication, data governance, and privacy controls built into every agent deployment." },
-  { icon: Cpu, title: "Hardware Agnostic", desc: "Run on NVIDIA, AMD, Intel, or cloud GPUs. No vendor lock-in — gBot adapts to your infrastructure." },
+  { icon: Cpu, title: "Hardware Agnostic", desc: "Run on NVIDIA, AMD, Intel, or cloud GPUs. No vendor lock-in — gClaw adapts to your infrastructure." },
   { icon: Globe, title: "Open-Source First", desc: "Built on NeMo and OpenClaw — fully transparent, community-driven, with enterprise support options." },
   { icon: Mic, title: "Voice + Multimodal", desc: "Native voice agents, image understanding, and multimodal interactions powered by state-of-the-art models." },
 ];
@@ -43,7 +43,7 @@ export const FEATURES: Feature[] = [
   { icon: Bot, title: "Autonomous Agent Workflows", desc: "Build complex multi-step agent pipelines with conditional logic, tool use, and human-in-the-loop approval gates." },
   { icon: Headphones, title: "Voice Agent Engine", desc: "Real-time conversational voice agents with ElevenLabs integration. Sub-200ms latency for natural dialogue." },
   { icon: Lock, title: "Zero-Trust Security", desc: "End-to-end encryption, SOC 2 compliance-ready architecture, role-based access control, and audit logging." },
-  { icon: Layers, title: "NeMo Model Pipeline", desc: "Fine-tune, evaluate, and deploy custom models using NVIDIA NeMo's training framework — directly from gBot." },
+  { icon: Layers, title: "NeMo Model Pipeline", desc: "Fine-tune, evaluate, and deploy custom models using NVIDIA NeMo's training framework — directly from gClaw." },
   { icon: Workflow, title: "OpenClaw Orchestration", desc: "Leverage the Claw ecosystem's agent coordination protocol for multi-agent collaboration and task decomposition." },
 ];
 
@@ -58,20 +58,20 @@ export type ComparisonStatus = "yes" | "no" | "partial";
 
 export interface ComparisonRow {
   feature: string;
-  gbot: ComparisonStatus;
+  gclaw: ComparisonStatus;
   openclaw: ComparisonStatus;
   nemoclaw: ComparisonStatus;
 }
 
 export const COMPARISON_DATA: ComparisonRow[] = [
-  { feature: "Open Source", gbot: "yes", openclaw: "yes", nemoclaw: "no" },
-  { feature: "Multi-Provider Models", gbot: "yes", openclaw: "partial", nemoclaw: "no" },
-  { feature: "Hardware Agnostic", gbot: "yes", openclaw: "yes", nemoclaw: "no" },
-  { feature: "Voice Agents", gbot: "yes", openclaw: "no", nemoclaw: "partial" },
-  { feature: "Enterprise Security", gbot: "yes", openclaw: "partial", nemoclaw: "yes" },
-  { feature: "NeMo Integration", gbot: "yes", openclaw: "no", nemoclaw: "yes" },
-  { feature: "Community Ecosystem", gbot: "yes", openclaw: "yes", nemoclaw: "no" },
-  { feature: "Self-Hosted Option", gbot: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Open Source", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Multi-Provider Models", gclaw: "yes", openclaw: "partial", nemoclaw: "no" },
+  { feature: "Hardware Agnostic", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Voice Agents", gclaw: "yes", openclaw: "no", nemoclaw: "partial" },
+  { feature: "Enterprise Security", gclaw: "yes", openclaw: "partial", nemoclaw: "yes" },
+  { feature: "NeMo Integration", gclaw: "yes", openclaw: "no", nemoclaw: "yes" },
+  { feature: "Community Ecosystem", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Self-Hosted Option", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
 ];
 
 // --- Roadmap ---
@@ -100,9 +100,9 @@ export interface Layer {
 }
 
 export const LAYERS: Layer[] = [
-  { icon: Cpu, title: "Chip Layer", subtitle: "NVIDIA · AMD · Intel", desc: "gBot is hardware-agnostic by design. Deploy on any GPU architecture — from datacenter H100s to edge devices.", color: "text-primary" },
-  { icon: Code, title: "Middleware Layer", subtitle: "NeMo · OpenClaw · CUDA", desc: "The orchestration backbone — combining NeMo's training pipeline with OpenClaw's agent coordination protocol.", color: "text-gbot-blue" },
-  { icon: Rocket, title: "Application Layer", subtitle: "gBot Platform", desc: "Where it all comes together — a production-ready interface for building, deploying, and managing AI agents.", color: "text-primary" },
+  { icon: Cpu, title: "Chip Layer", subtitle: "NVIDIA · AMD · Intel", desc: "gClaw is hardware-agnostic by design. Deploy on any GPU architecture — from datacenter H100s to edge devices.", color: "text-gclaw-red" },
+  { icon: Code, title: "Middleware Layer", subtitle: "NeMo · OpenClaw · CUDA", desc: "The orchestration backbone — combining NeMo's training pipeline with OpenClaw's agent coordination protocol.", color: "text-gclaw-blue" },
+  { icon: Rocket, title: "Application Layer", subtitle: "gClaw Platform", desc: "Where it all comes together — a production-ready interface for building, deploying, and managing AI agents.", color: "text-gclaw-green" },
 ];
 
 // --- Ecosystem ---
@@ -114,10 +114,10 @@ export interface EcosystemVariant {
 }
 
 export const ECOSYSTEM_VARIANTS: EcosystemVariant[] = [
-  { icon: Bot, name: "gBot Core", desc: "The foundational agent platform — open-source, self-hostable, community-driven.", badge: "Free" },
-  { icon: Shield, name: "gBot Enterprise", desc: "SOC 2 compliant, SSO, audit logging, priority support, and SLA guarantees.", badge: "Coming Soon" },
-  { icon: Wrench, name: "gBot Builder", desc: "No-code agent builder with visual workflow editor and pre-built templates.", badge: "Coming Soon" },
-  { icon: Users, name: "gBot Community", desc: "Shared agent templates, plugins, and integrations contributed by the community.", badge: "Open" },
+  { icon: Bot, name: "gClaw Core", desc: "The foundational agent platform — open-source, self-hostable, community-driven.", badge: "Free" },
+  { icon: Shield, name: "gClaw Enterprise", desc: "SOC 2 compliant, SSO, audit logging, priority support, and SLA guarantees.", badge: "Coming Soon" },
+  { icon: Wrench, name: "gClaw Builder", desc: "No-code agent builder with visual workflow editor and pre-built templates.", badge: "Coming Soon" },
+  { icon: Users, name: "gClaw Community", desc: "Shared agent templates, plugins, and integrations contributed by the community.", badge: "Open" },
 ];
 
 // --- FAQs ---
@@ -127,12 +127,12 @@ export interface FAQ {
 }
 
 export const FAQS: FAQ[] = [
-  { q: "What makes gBot different from NemoClaw or OpenClaw?", a: "gBot combines the enterprise-grade model pipeline from NVIDIA NeMo with the open-source agent orchestration of the OpenClaw ecosystem. Unlike NemoClaw (proprietary) or OpenClaw (community-only), gBot bridges both worlds — offering enterprise security with open-source transparency and hardware flexibility." },
-  { q: "Which AI models does gBot support?", a: "gBot supports multi-provider model routing including Google Gemini, OpenAI GPT models, and NVIDIA NIM inference microservices. You can switch providers per-agent or per-conversation, and add custom fine-tuned models via the NeMo pipeline." },
-  { q: "Can I run gBot on non-NVIDIA hardware?", a: "Yes. gBot is hardware-agnostic by design. While it leverages NVIDIA NeMo for training workflows, the inference and agent runtime supports AMD ROCm, Intel oneAPI, and standard CPU deployments." },
-  { q: "Is gBot truly open source?", a: "The gBot Core platform is fully open-source under a permissive license. Enterprise features (SSO, audit logging, SLA support) are available as a commercial offering. The community ecosystem — templates, plugins, integrations — is always open." },
-  { q: "How does voice agent support work?", a: "gBot integrates with ElevenLabs for real-time conversational voice agents with sub-200ms latency. Voice agents can be deployed alongside text-based agents, sharing the same underlying model and system prompts." },
-  { q: "What security certifications does gBot target?", a: "gBot is architected for SOC 2 Type II compliance with features including end-to-end encryption, role-based access control, audit logging, data residency controls, and zero-trust network architecture." },
+  { q: "What makes gClaw different from NemoClaw or OpenClaw?", a: "gClaw combines the enterprise-grade model pipeline from NVIDIA NeMo with the open-source agent orchestration of the OpenClaw ecosystem. Unlike NemoClaw (proprietary) or OpenClaw (community-only), gClaw bridges both worlds — offering enterprise security with open-source transparency and hardware flexibility." },
+  { q: "Which AI models does gClaw support?", a: "gClaw supports multi-provider model routing including Google Gemini, OpenAI GPT models, and NVIDIA NIM inference microservices. You can switch providers per-agent or per-conversation, and add custom fine-tuned models via the NeMo pipeline." },
+  { q: "Can I run gClaw on non-NVIDIA hardware?", a: "Yes. gClaw is hardware-agnostic by design. While it leverages NVIDIA NeMo for training workflows, the inference and agent runtime supports AMD ROCm, Intel oneAPI, and standard CPU deployments." },
+  { q: "Is gClaw truly open source?", a: "The gClaw Core platform is fully open-source under a permissive license. Enterprise features (SSO, audit logging, SLA support) are available as a commercial offering. The community ecosystem — templates, plugins, integrations — is always open." },
+  { q: "How does voice agent support work?", a: "gClaw integrates with ElevenLabs for real-time conversational voice agents with sub-200ms latency. Voice agents can be deployed alongside text-based agents, sharing the same underlying model and system prompts." },
+  { q: "What security certifications does gClaw target?", a: "gClaw is architected for SOC 2 Type II compliance with features including end-to-end encryption, role-based access control, audit logging, data residency controls, and zero-trust network architecture." },
 ];
 
 // --- Footer ---
