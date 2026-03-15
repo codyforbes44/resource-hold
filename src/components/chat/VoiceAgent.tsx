@@ -33,12 +33,23 @@ const VoiceAgent = () => {
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   const conversation = useConversation({
-    onConnect: () => toast.success("Voice agent connected"),
+    onConnect: () => {
+      toast.success("Voice agent connected");
+      connectedAtRef.current = Date.now();
+      setElapsed(0);
+      silenceCountRef.current = 0;
+      setSignalQuality("good");
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - connectedAtRef.current) / 1000));
+      }, 1000);
+    },
     onDisconnect: () => {
       toast.info("Voice agent disconnected");
       cancelAnimationFrame(animFrameRef.current);
+      clearInterval(timerRef.current);
       setInputLevel(0);
       setOutputLevel(0);
+      setElapsed(0);
     },
     onError: (error) => {
       console.error("Voice agent error:", error);
