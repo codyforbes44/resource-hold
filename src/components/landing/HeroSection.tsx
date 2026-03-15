@@ -94,7 +94,7 @@ const HeroSection = () => {
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
   return (
-    <section ref={sectionRef} className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
+    <section ref={sectionRef} className="relative overflow-hidden pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
       {/* Parallax background */}
       <motion.div className="absolute inset-0 -z-10" style={{ y: bgY }}>
         <img src={heroBg} alt="" aria-hidden="true" className="absolute inset-0 h-[130%] w-full object-cover" />
