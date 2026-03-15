@@ -110,7 +110,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-cycle-brand bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary"
+          className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-cycle-brand bg-primary/10 px-3 py-1 text-xs font-medium text-primary sm:mb-8 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-sm"
         >
           <Zap className="h-3.5 w-3.5" />
           Open-Source · Hardware Agnostic · Enterprise Ready
