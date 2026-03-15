@@ -32,7 +32,7 @@ const ComparisonTable = () => {
   return (
     <SectionWrapper id="comparison">
       <SectionHeader description="gClaw combines the best of both worlds — open-source flexibility with enterprise capability.">
-        How gClaw <span className="text-gradient-brand">Compares</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />
+        How &gt; gClaw <span className="text-gradient-brand">Compares</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />
       </SectionHeader>
 
       {/* Desktop table */}
