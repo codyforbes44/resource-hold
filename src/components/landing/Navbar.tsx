@@ -47,7 +47,7 @@ const Navbar = () => {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <a href="#" className="flex items-center text-xl font-bold">
-          <span className="font-mono tracking-tight"><span className="text-foreground">g</span><span className="text-gradient-brand">Claw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" /></span>
+          <span className="font-mono tracking-tight"><span className="text-foreground">&gt; g</span><span className="text-gradient-brand">Claw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" /></span>
         </a>
 
         {/* Desktop links */}

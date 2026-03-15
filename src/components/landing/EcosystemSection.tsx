@@ -6,7 +6,7 @@ const EcosystemSection = () => {
   return (
     <SectionWrapper id="ecosystem">
       <SectionHeader description="A family of products and community resources built around the gClaw platform.">
-        The gClaw <span className="text-gradient-brand">Ecosystem</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />
+        The &gt; gClaw <span className="text-gradient-brand">Ecosystem</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />
       </SectionHeader>
 
       <div className="mx-auto mt-16 grid max-w-4xl gap-6 sm:grid-cols-2">

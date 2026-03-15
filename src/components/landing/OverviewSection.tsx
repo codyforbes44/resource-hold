@@ -6,7 +6,7 @@ const OverviewSection = () => {
   return (
     <SectionWrapper id="overview" borderTop={false}>
       <SectionHeader description="gClaw merges NVIDIA's NeMo framework for model training and inference with the OpenClaw ecosystem's open-source agent orchestration — creating a unified platform for building, deploying, and managing enterprise AI agents at any scale.">
-        What is <span className="text-gradient-brand">gClaw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />?
+        What is <span className="text-gradient-brand">&gt; gClaw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />?
       </SectionHeader>
 
       <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

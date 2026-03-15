@@ -20,7 +20,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-8 border-t border-border/30 pt-6 text-center text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} gClaw. Open-source AI agent platform. Built on NVIDIA NeMo & OpenClaw.</p>
+          <p>© {new Date().getFullYear()} &gt; gClaw. Open-source AI agent platform. Built on NVIDIA NeMo & OpenClaw.</p>
           <p className="mt-1">NVIDIA, NeMo, and NIM are trademarks of NVIDIA Corporation. Google, Gemini are trademarks of Google LLC.</p>
         </div>
       </div>

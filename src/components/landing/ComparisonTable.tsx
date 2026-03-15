@@ -20,7 +20,7 @@ const ComparisonCard = ({ row }: { row: typeof COMPARISON_DATA[0] }) => (
         <div key={key} className="flex flex-col items-center gap-1">
           <StatusIcon status={row[key]} />
           <span className={`text-xs ${key === "gclaw" ? "font-bold text-primary" : "text-muted-foreground"}`}>
-            {key === "gclaw" ? "gClaw" : key === "openclaw" ? "OpenClaw" : "NemoClaw"}
+            {key === "gclaw" ? "> gClaw" : key === "openclaw" ? "OpenClaw" : "NemoClaw"}
           </span>
         </div>
       ))}
@@ -32,7 +32,7 @@ const ComparisonTable = () => {
   return (
     <SectionWrapper id="comparison">
       <SectionHeader description="gClaw combines the best of both worlds — open-source flexibility with enterprise capability.">
-        How gClaw <span className="text-gradient-brand">Compares</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />
+        How &gt; gClaw <span className="text-gradient-brand">Compares</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" />
       </SectionHeader>
 
       {/* Desktop table */}
@@ -41,7 +41,7 @@ const ComparisonTable = () => {
           <TableHeader>
             <TableRow className="border-border/50 bg-card hover:bg-card">
               <TableHead className="w-[200px] text-foreground">Feature</TableHead>
-              <TableHead className="text-center font-display font-bold text-primary">gClaw</TableHead>
+              <TableHead className="text-center font-display font-bold text-primary">&gt; gClaw</TableHead>
               <TableHead className="text-center text-muted-foreground">OpenClaw</TableHead>
               <TableHead className="text-center text-muted-foreground">NemoClaw</TableHead>
             </TableRow>
