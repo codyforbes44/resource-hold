@@ -1,10 +1,54 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Github, Zap } from "lucide-react";
 import heroBg from "@/assets/hero-bg.png";
 import { HERO_STATS } from "@/constants/landing";
+
+const PARTICLE_COUNT = 40;
+
+const HeroParticles = () => {
+  const particles = useMemo(() => {
+    return Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      size: Math.random() * 2.5 + 1,
+      delay: Math.random() * 6,
+      duration: Math.random() * 4 + 4,
+      opacity: Math.random() * 0.4 + 0.1,
+    }));
+  }, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      {particles.map((p) => (
+        <motion.span
+          key={p.id}
+          className="absolute rounded-full bg-primary"
+          style={{
+            left: p.left,
+            top: p.top,
+            width: p.size,
+            height: p.size,
+          }}
+          animate={{
+            opacity: [0, p.opacity, 0],
+            y: [0, -20 - Math.random() * 30, 0],
+            x: [0, (Math.random() - 0.5) * 20, 0],
+          }}
+          transition={{
+            duration: p.duration,
+            delay: p.delay,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 const AnimatedCounter = ({ value, label }: { value: string; label: string }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -57,6 +101,7 @@ const HeroSection = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute top-1/3 right-1/4 h-[300px] w-[300px] rounded-full bg-gclaw-red/5 blur-[100px]" />
+        <HeroParticles />
       </motion.div>
 
       <div className="container text-center">
