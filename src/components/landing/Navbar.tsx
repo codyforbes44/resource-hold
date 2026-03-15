@@ -82,8 +82,8 @@ const Navbar = () => {
           <Button variant="ghost" size="sm" className="text-muted-foreground">
             Docs
           </Button>
-          <Button size="sm" className="glow-brand">
-            Get Started
+          <Button size="sm" className="glow-brand" asChild>
+            <Link to="/chat">Get Started</Link>
           </Button>
         </div>
 
