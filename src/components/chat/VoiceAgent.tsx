@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Phone, PhoneOff, Volume2, VolumeX } from "lucide-react";
+import { Phone, PhoneOff, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type TranscriptEntry = {
