@@ -194,8 +194,36 @@ const VoiceAgent = () => {
   const outputScale = 1 + outputLevel * 0.6;
   const isActive = conversation.status === "connected";
 
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const qualityColor =
+    signalQuality === "good"
+      ? "bg-green-500"
+      : signalQuality === "fair"
+        ? "bg-yellow-500"
+        : "bg-destructive";
+
+  const qualityLabel =
+    signalQuality === "good" ? "Strong" : signalQuality === "fair" ? "Fair" : "Weak";
+
   return (
     <div className="flex flex-1 flex-col items-center gap-4 p-6">
+      {/* Connection Quality Indicator */}
+      {isActive && (
+        <div className="flex items-center gap-3 rounded-full border border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Wifi className="h-3.5 w-3.5" />
+            <span className={`inline-block h-2 w-2 rounded-full ${qualityColor}`} />
+            <span>{qualityLabel}</span>
+          </div>
+          <span className="text-border">|</span>
+          <span className="tabular-nums">{formatTime(elapsed)}</span>
+        </div>
+      )}
       {/* Visualization Orb */}
       <div className="relative flex items-center justify-center py-8">
         {/* Outer ring — output (agent speaking) */}
