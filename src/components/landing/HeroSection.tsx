@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Github, Zap } from "lucide-react";
+import heroBg from "@/assets/hero-bg.png";
 import { HERO_STATS } from "@/constants/landing";
 
 const AnimatedCounter = ({ value, label }: { value: string; label: string }) => {
