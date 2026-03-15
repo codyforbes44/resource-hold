@@ -72,7 +72,7 @@ const HeroSection = () => {
           className="mx-auto max-w-4xl font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl"
         >
           Enterprise AI Agents,{" "}
-          <span className="text-gradient-brand">Redefined</span>
+          <span className="text-cycle-brand">Redefined</span>
         </motion.h1>
 
         {/* Subheadline */}
