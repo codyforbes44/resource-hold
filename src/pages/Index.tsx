@@ -41,7 +41,7 @@ const Index = () => {
           variant="outline"
           className="font-mono text-[10px] tracking-widest bg-card/80 backdrop-blur-sm border-glow glow-brand px-3 py-1.5 uppercase text-muted-foreground"
         >
-          perfect
+          gClaw_
         </Badge>
       </div>
     </div>
