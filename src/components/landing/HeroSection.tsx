@@ -121,7 +121,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="mx-auto max-w-4xl font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl"
+          className="mx-auto max-w-4xl font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl lg:text-7xl"
         >
           Enterprise AI Agents,{" "}
           <span className="text-cycle-brand">Redefined</span>
