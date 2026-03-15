@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Phone, PhoneOff, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
+import { Phone, PhoneOff, Volume2, VolumeX, Wifi } from "lucide-react";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type TranscriptEntry = {
@@ -15,7 +15,16 @@ type TranscriptEntry = {
   timestamp: Date;
 };
 
-const VoiceAgent = () => {
+type Conversation = { id: string; title: string; model: string; created_at: string };
+
+interface VoiceAgentProps {
+  userId: string;
+  onConversationSaved?: (conv: Conversation) => void;
+}
+
+const VOICE_MODEL = "elevenlabs/voice-agent";
+
+const VoiceAgent = ({ userId, onConversationSaved }: VoiceAgentProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
@@ -31,6 +40,17 @@ const VoiceAgent = () => {
   const connectedAtRef = useRef<number>(0);
   const silenceCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const convIdRef = useRef<string | null>(null);
+
+  // Save a single transcript entry to DB
+  const saveMessage = useCallback(async (convId: string, role: string, content: string) => {
+    await supabase.from("messages").insert({
+      conversation_id: convId,
+      role,
+      content,
+      model: VOICE_MODEL,
+    });
+  }, []);
 
   const conversation = useConversation({
     onConnect: () => {
@@ -50,6 +70,16 @@ const VoiceAgent = () => {
       setInputLevel(0);
       setOutputLevel(0);
       setElapsed(0);
+      // Update conversation title from first user message
+      const convId = convIdRef.current;
+      if (convId) {
+        const firstUser = transcript.find((e) => e.role === "user");
+        if (firstUser) {
+          const title = `🎙 ${firstUser.text.slice(0, 55)}`;
+          supabase.from("conversations").update({ title }).eq("id", convId);
+        }
+      }
+      convIdRef.current = null;
     },
     onError: (error) => {
       console.error("Voice agent error:", error);
@@ -63,6 +93,7 @@ const VoiceAgent = () => {
             ...prev,
             { id: String(++entryIdRef.current), role: "user", text, timestamp: new Date() },
           ]);
+          if (convIdRef.current) saveMessage(convIdRef.current, "user", text);
         }
       } else if (message.type === "agent_response") {
         const text = message.agent_response_event?.agent_response;
@@ -71,6 +102,7 @@ const VoiceAgent = () => {
             ...prev,
             { id: String(++entryIdRef.current), role: "agent", text, timestamp: new Date() },
           ]);
+          if (convIdRef.current) saveMessage(convIdRef.current, "assistant", text);
         }
       } else if (message.type === "agent_response_correction") {
         const corrected = message.agent_response_correction_event?.corrected_agent_response;
@@ -100,13 +132,11 @@ const VoiceAgent = () => {
       setInputLevel(inVol);
       setOutputLevel(outVol);
 
-      // Track signal quality based on audio flow
       if (inVol < 0.01 && outVol < 0.01) {
         silenceCountRef.current++;
       } else {
         silenceCountRef.current = 0;
       }
-      // ~3s of total silence at 60fps = ~180 frames
       if (silenceCountRef.current > 300) {
         setSignalQuality("poor");
       } else if (silenceCountRef.current > 120) {
@@ -163,6 +193,16 @@ const VoiceAgent = () => {
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
+      // Create conversation in DB
+      const { data: convData, error: convError } = await supabase
+        .from("conversations")
+        .insert({ user_id: userId, model: VOICE_MODEL, title: "🎙 Voice Chat" })
+        .select()
+        .single();
+      if (convError || !convData) throw new Error("Failed to create conversation");
+      convIdRef.current = convData.id;
+      onConversationSaved?.(convData as Conversation);
+
       const { data, error } = await supabase.functions.invoke("elevenlabs-token");
       if (error || !data?.token) throw new Error("Failed to get conversation token");
 
@@ -183,13 +223,13 @@ const VoiceAgent = () => {
     } finally {
       setIsConnecting(false);
     }
-  }, [conversation, volume]);
+  }, [conversation, volume, userId, onConversationSaved]);
 
   const stopConversation = useCallback(async () => {
     await conversation.endSession();
   }, [conversation]);
 
-  // Visualization ring sizes based on audio levels
+  // Visualization
   const inputScale = 1 + inputLevel * 0.5;
   const outputScale = 1 + outputLevel * 0.6;
   const isActive = conversation.status === "connected";
@@ -226,7 +266,6 @@ const VoiceAgent = () => {
       )}
       {/* Visualization Orb */}
       <div className="relative flex items-center justify-center py-8">
-        {/* Outer ring — output (agent speaking) */}
         <div
           className="absolute rounded-full border-2 transition-transform duration-75"
           style={{
@@ -238,7 +277,6 @@ const VoiceAgent = () => {
             transform: `scale(${isActive ? outputScale : 1})`,
           }}
         />
-        {/* Middle ring — input (user speaking) */}
         <div
           className="absolute rounded-full border-2 transition-transform duration-75"
           style={{
@@ -250,7 +288,6 @@ const VoiceAgent = () => {
             transform: `scale(${isActive ? inputScale : 1})`,
           }}
         />
-        {/* Core orb */}
         <div
           className={`relative z-10 flex h-24 w-24 items-center justify-center rounded-full transition-all duration-300 ${
             isActive
@@ -291,7 +328,6 @@ const VoiceAgent = () => {
         </Button>
       ) : (
         <div className="flex items-center gap-4">
-          {/* Volume */}
           <div className="flex items-center gap-2">
             <button onClick={toggleMute} className="text-muted-foreground hover:text-foreground">
               {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
