@@ -34,6 +34,16 @@ const Index = () => {
         <FAQSection />
       </main>
       <Footer />
+
+      {/* Version Badge */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Badge
+          variant="outline"
+          className="font-mono text-[10px] tracking-widest bg-card/80 backdrop-blur-sm border-glow glow-brand px-3 py-1.5 uppercase text-muted-foreground"
+        >
+          perfect
+        </Badge>
+      </div>
     </div>
   );
 };
