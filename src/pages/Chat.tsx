@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Send, Trash2, LogOut, Mic, Home } from "lucide-react";
+import { Plus, Send, Trash2, LogOut, Mic, Home, PanelLeftClose, PanelLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import VoiceAgent from "@/components/chat/VoiceAgent";
 import logoSrc from "@/assets/logo-gclaw.png";
