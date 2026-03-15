@@ -263,7 +263,7 @@ const Chat = () => {
         <div className="flex items-center justify-between border-b border-border p-4">
           <div className="flex items-center gap-2">
             <img src={logoSrc} alt="gClaw" className="h-6 w-6" />
-            <span className="font-display font-bold">gClaw Chat</span>
+            <span className="font-mono font-bold tracking-tight">gClaw <span className="text-muted-foreground font-normal">Chat</span></span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
