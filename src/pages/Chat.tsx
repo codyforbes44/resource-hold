@@ -9,7 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -52,15 +54,30 @@ const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePan
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
 
-const MODELS = [
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
-  { value: "openai/gpt-5", label: "GPT-5" },
-  { value: "zephel/zephel", label: "Zephel" },
-  { value: "zephel/zephel-pro", label: "Zephel Pro" },
-  { value: "zephel/zephel-fast", label: "Zephel Fast" },
+const MODEL_GROUPS = [
+  {
+    label: "Google",
+    models: [
+      { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
+      { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    ],
+  },
+  {
+    label: "OpenAI",
+    models: [
+      { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
+      { value: "openai/gpt-5", label: "GPT-5" },
+    ],
+  },
+  {
+    label: "Zephel",
+    models: [
+      { value: "zephel/zephel", label: "Zephel" },
+      { value: "zephel/zephel-pro", label: "Zephel Pro" },
+      { value: "zephel/zephel-fast", label: "Zephel Fast" },
+    ],
+  },
 ];
 
 const SUGGESTED_PROMPTS = [
@@ -83,7 +100,7 @@ const Chat = () => {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState(MODELS[0].value);
+  const [model, setModel] = useState(MODEL_GROUPS[0].models[0].value);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -601,10 +618,15 @@ const Chat = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MODELS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
+              {MODEL_GROUPS.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.models.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
