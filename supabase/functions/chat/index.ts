@@ -355,7 +355,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
       );
 
-      const result = await executeTool(fnName, fnArgs, LOVABLE_API_KEY);
+      const result = await executeTool(fnName, fnArgs, LOVABLE_API_KEY, userId || "");
 
       if (result.startsWith("IMAGE_DATA:")) {
         const imageDataUrl = result.slice(11);
