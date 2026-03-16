@@ -518,7 +518,14 @@ const Chat = () => {
   );
 
   const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
-  const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
+
+  // Filter model groups by allowed models
+  const MODEL_GROUPS = ALL_MODEL_GROUPS
+    .map((group) => ({
+      ...group,
+      models: group.models.filter((m) => !allowedModels || allowedModels.includes(m.value)),
+    }))
+    .filter((group) => group.models.length > 0);
 
   return (
     <div className="flex h-[100dvh] bg-background">
