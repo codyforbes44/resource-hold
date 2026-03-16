@@ -38,13 +38,15 @@ import {
   Check,
   Pencil,
 } from "lucide-react";
-import VoiceAgent from "@/components/chat/VoiceAgent";
+import { lazy, Suspense } from "react";
+const VoiceAgent = lazy(() => import("@/components/chat/VoiceAgent"));
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
-import MarkdownRenderer from "@/components/chat/MarkdownRenderer";
-import KnowledgeBasePanel from "@/components/chat/KnowledgeBasePanel";
+const MarkdownRenderer = lazy(() => import("@/components/chat/MarkdownRenderer"));
+const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePanel"));
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
+import { getAccessToken } from "@/lib/supabase-helpers";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
