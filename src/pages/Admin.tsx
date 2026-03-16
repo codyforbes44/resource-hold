@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import {
@@ -20,7 +21,10 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  Cpu,
+  Globe,
   UserCog,
+  Eye,
 } from "lucide-react";
 import logoSrc from "@/assets/logo-gclaw.png";
 import {
@@ -51,6 +55,34 @@ type AuditLog = {
   created_at: string;
 };
 
+type ModelDefault = {
+  model: string;
+  enabled: boolean;
+  visitor_enabled: boolean;
+};
+
+type UserModelOverride = {
+  user_id: string;
+  model: string;
+  enabled: boolean;
+};
+
+const PROVIDER_CONFIG: Record<string, { color: string; label: string }> = {
+  google: { color: "hsl(var(--primary))", label: "Google" },
+  openai: { color: "hsl(142 71% 45%)", label: "OpenAI" },
+  zephel: { color: "hsl(270 70% 60%)", label: "Zephel" },
+};
+
+function getProvider(model: string) {
+  const prefix = model.split("/")[0];
+  return PROVIDER_CONFIG[prefix] || { color: "hsl(var(--muted-foreground))", label: prefix };
+}
+
+function getModelLabel(model: string) {
+  const name = model.split("/")[1] || model;
+  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const Admin = () => {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -63,6 +95,10 @@ const Admin = () => {
   const [convSearch, setConvSearch] = useState("");
   const [stats, setStats] = useState({ totalUsers: 0, totalConversations: 0, totalMessages: 0 });
   const [loading, setLoading] = useState(true);
+  const [modelDefaults, setModelDefaults] = useState<ModelDefault[]>([]);
+  const [userOverrides, setUserOverrides] = useState<UserModelOverride[]>([]);
+  const [overrideUserId, setOverrideUserId] = useState("");
+  const [togglingModel, setTogglingModel] = useState<string | null>(null);
 
   useEffect(() => {
     if (roleLoading) return;
@@ -74,29 +110,31 @@ const Admin = () => {
     loadAdminData();
   }, [isAdmin, roleLoading]);
 
+  const callAdmin = async (method: string, body?: any) => {
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data`;
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    const resp = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || "Request failed");
+    }
+    return resp.json();
+  };
+
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data`;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-
-      const resp = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || "Failed to load admin data");
-      }
-
-      const data = await resp.json();
+      const data = await callAdmin("GET");
       setProfiles(data.profiles || []);
       setConversations(data.conversations || []);
       setAuditLogs(data.auditLogs || []);
       setStats(data.stats || { totalUsers: 0, totalConversations: 0, totalMessages: 0 });
+      setModelDefaults(data.modelDefaults || []);
+      setUserOverrides(data.userModelOverrides || []);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -106,19 +144,7 @@ const Admin = () => {
 
   const handleAssignRole = async (userId: string, role: string) => {
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data`;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ action: "assign_role", user_id: userId, role }),
-      });
-
-      if (!resp.ok) throw new Error("Failed to assign role");
+      await callAdmin("POST", { action: "assign_role", user_id: userId, role });
       toast.success(`Role "${role}" assigned`);
       loadAdminData();
     } catch (err: any) {
@@ -128,21 +154,43 @@ const Admin = () => {
 
   const handleRevokeRole = async (userId: string, role: string) => {
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data`;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ action: "revoke_role", user_id: userId, role }),
-      });
-
-      if (!resp.ok) throw new Error("Failed to revoke role");
+      await callAdmin("POST", { action: "revoke_role", user_id: userId, role });
       toast.success(`Role "${role}" revoked`);
       loadAdminData();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleToggleModelDefault = async (model: string, field: "enabled" | "visitor_enabled", value: boolean) => {
+    setTogglingModel(model);
+    try {
+      await callAdmin("POST", { action: "set_model_default", model, [field]: value });
+      setModelDefaults((prev) =>
+        prev.map((m) => (m.model === model ? { ...m, [field]: value } : m))
+      );
+      toast.success(`${getModelLabel(model)} ${field === "enabled" ? "user access" : "visitor access"} ${value ? "enabled" : "disabled"}`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setTogglingModel(null);
+    }
+  };
+
+  const handleSetUserOverride = async (userId: string, model: string, enabled: boolean | null) => {
+    try {
+      await callAdmin("POST", { action: "set_user_model_override", user_id: userId, model, enabled });
+      if (enabled === null) {
+        setUserOverrides((prev) => prev.filter((o) => !(o.user_id === userId && o.model === model)));
+        toast.success("Override removed");
+      } else {
+        setUserOverrides((prev) => {
+          const existing = prev.find((o) => o.user_id === userId && o.model === model);
+          if (existing) return prev.map((o) => (o.user_id === userId && o.model === model ? { ...o, enabled } : o));
+          return [...prev, { user_id: userId, model, enabled }];
+        });
+        toast.success(`Override ${enabled ? "granted" : "revoked"} for model`);
+      }
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -178,6 +226,21 @@ const Admin = () => {
     { name: "Messages", value: stats.totalMessages },
   ];
 
+  // Group models by provider for display
+  const modelsByProvider = modelDefaults.reduce<Record<string, ModelDefault[]>>((acc, m) => {
+    const provider = m.model.split("/")[0];
+    if (!acc[provider]) acc[provider] = [];
+    acc[provider].push(m);
+    return acc;
+  }, {});
+
+  const selectedUserOverrides = overrideUserId
+    ? modelDefaults.map((md) => {
+        const override = userOverrides.find((o) => o.user_id === overrideUserId && o.model === md.model);
+        return { ...md, override: override?.enabled ?? null };
+      })
+    : [];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -198,10 +261,14 @@ const Admin = () => {
 
       <div className="container px-4 py-6">
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="w-full grid grid-cols-4 mb-6">
+          <TabsList className="w-full grid grid-cols-5 mb-6">
             <TabsTrigger value="users" className="gap-1.5 text-xs sm:text-sm">
               <Users className="h-4 w-4 hidden sm:block" />
               Users
+            </TabsTrigger>
+            <TabsTrigger value="models" className="gap-1.5 text-xs sm:text-sm">
+              <Cpu className="h-4 w-4 hidden sm:block" />
+              Models
             </TabsTrigger>
             <TabsTrigger value="conversations" className="gap-1.5 text-xs sm:text-sm">
               <MessageSquare className="h-4 w-4 hidden sm:block" />
@@ -270,6 +337,150 @@ const Admin = () => {
                 )}
               </div>
             </ScrollArea>
+          </TabsContent>
+
+          {/* Models Tab */}
+          <TabsContent value="models" className="space-y-6">
+            {/* Global Model Defaults */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Global Model Access
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Control which models are available to registered users and anonymous visitors.
+              </p>
+              <div className="space-y-4">
+                {Object.entries(modelsByProvider).map(([provider, models]) => {
+                  const config = getProvider(provider + "/");
+                  return (
+                    <div key={provider}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: config.color }}
+                        />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {config.label}
+                        </span>
+                      </div>
+                      <div className="grid gap-2">
+                        {models.map((md) => (
+                          <div
+                            key={md.model}
+                            className="flex items-center justify-between rounded-lg border border-border p-3 bg-card"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{getModelLabel(md.model)}</p>
+                              <p className="text-[11px] text-muted-foreground font-mono">{md.model}</p>
+                            </div>
+                            <div className="flex items-center gap-4 shrink-0">
+                              <div className="flex flex-col items-center gap-1">
+                                <Switch
+                                  checked={md.enabled}
+                                  disabled={togglingModel === md.model}
+                                  onCheckedChange={(v) => handleToggleModelDefault(md.model, "enabled", v)}
+                                />
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Users className="h-2.5 w-2.5" /> Users
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-center gap-1">
+                                <Switch
+                                  checked={md.visitor_enabled}
+                                  disabled={togglingModel === md.model}
+                                  onCheckedChange={(v) => handleToggleModelDefault(md.model, "visitor_enabled", v)}
+                                />
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Eye className="h-2.5 w-2.5" /> Visitors
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Per-User Overrides */}
+            <div className="border-t border-border pt-6">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <UserCog className="h-4 w-4" />
+                Per-User Model Overrides
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Grant or revoke model access for specific users, overriding global defaults.
+              </p>
+              <div className="flex items-center gap-2 mb-4">
+                <Select value={overrideUserId} onValueChange={setOverrideUserId}>
+                  <SelectTrigger className="w-full max-w-sm">
+                    <SelectValue placeholder="Select a user..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.user_id} value={p.user_id}>
+                        {p.display_name || p.user_id.slice(0, 8)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {overrideUserId && (
+                <div className="grid gap-2">
+                  {selectedUserOverrides.map((item) => (
+                    <div
+                      key={item.model}
+                      className="flex items-center justify-between rounded-lg border border-border p-3 bg-card"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{getModelLabel(item.model)}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">
+                            Global: {item.enabled ? "✓" : "✗"}
+                          </span>
+                          {item.override !== null && (
+                            <Badge variant="outline" className="text-[10px] h-4">
+                              Override: {item.override ? "Granted" : "Revoked"}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant={item.override === true ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs h-7 px-2"
+                          onClick={() => handleSetUserOverride(overrideUserId, item.model, true)}
+                        >
+                          Grant
+                        </Button>
+                        <Button
+                          variant={item.override === false ? "destructive" : "outline"}
+                          size="sm"
+                          className="text-xs h-7 px-2"
+                          onClick={() => handleSetUserOverride(overrideUserId, item.model, false)}
+                        >
+                          Revoke
+                        </Button>
+                        {item.override !== null && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            onClick={() => handleSetUserOverride(overrideUserId, item.model, null)}
+                          >
+                            Reset
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           {/* Conversations Tab */}

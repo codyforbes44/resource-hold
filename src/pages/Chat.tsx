@@ -54,13 +54,15 @@ const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePan
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
 
-const MODEL_GROUPS = [
+const ALL_MODEL_GROUPS = [
   {
     label: "Google",
     models: [
       { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
       { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
       { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+      { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
     ],
   },
   {
@@ -68,6 +70,8 @@ const MODEL_GROUPS = [
     models: [
       { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
       { value: "openai/gpt-5", label: "GPT-5" },
+      { value: "openai/gpt-5-nano", label: "GPT-5 Nano" },
+      { value: "openai/gpt-5.2", label: "GPT-5.2" },
     ],
   },
   {
