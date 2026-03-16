@@ -375,5 +375,4 @@ export const FOOTER_LINKS = [
   { label: "Documentation", href: "#faq" },
   { label: "Architecture", href: "#architecture" },
   { label: "Ecosystem", href: "#ecosystem" },
-  { label: "Roadmap", href: "#roadmap" },
 ] as const;
