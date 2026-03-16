@@ -209,6 +209,27 @@ const Chat = () => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
+  // Auto-switch model if current selection becomes incompatible with enabled skills
+  useEffect(() => {
+    const activeSkillsForSwitch = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
+    if (activeSkillsForSwitch.length === 0) return;
+    const supported = MODEL_SKILL_COMPAT[model] || [];
+    const incompatible = activeSkillsForSwitch.filter((skillId) => !supported.includes(skillId));
+    if (incompatible.length > 0) {
+      // Find first compatible model from allowed models
+      const allAllowed = ALL_MODEL_GROUPS.flatMap((g) => g.models)
+        .filter((m) => !allowedModels || allowedModels.includes(m.value));
+      const firstCompatible = allAllowed.find((m) => {
+        const mSupported = MODEL_SKILL_COMPAT[m.value] || [];
+        return activeSkillsForSwitch.every((s) => mSupported.includes(s));
+      });
+      if (firstCompatible) {
+        setModel(firstCompatible.value);
+        toast.info(`Switched to ${firstCompatible.label} — ${incompatible.map((s) => SKILL_LABELS[s] || s).join(", ")} not supported by previous model`);
+      }
+    }
+  }, [skills, allowedModels]);
+
   useEffect(() => {
     if (!user) return;
     supabase
