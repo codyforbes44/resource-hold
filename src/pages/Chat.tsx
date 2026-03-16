@@ -843,17 +843,17 @@ const Chat = () => {
           </DrawerContent>
         </Drawer>
       ) : (
-        skillsPanelOpen && (
-          <div className="flex w-72 flex-col border-l border-border bg-card">
-            <SkillsPanel
-              open={skillsPanelOpen}
-              onClose={() => setSkillsPanelOpen(false)}
-              skills={skills}
-              onToggleSkill={toggleSkill}
-            />
-            <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
-          </div>
-        )
+        <>
+          <SkillsPanel
+            open={skillsPanelOpen}
+            onClose={() => setSkillsPanelOpen(false)}
+            skills={skills}
+            onToggleSkill={toggleSkill}
+            knowledgeBasePanel={
+              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+            }
+          />
+        </>
       )}
     </div>
   );
