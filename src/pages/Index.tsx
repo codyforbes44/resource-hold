@@ -7,6 +7,7 @@ import PartnersSection from "@/components/landing/PartnersSection";
 import ComparisonTable from "@/components/landing/ComparisonTable";
 import RoadmapTimeline from "@/components/landing/RoadmapTimeline";
 import WhyItMatters from "@/components/landing/WhyItMatters";
+import ArchitectureSection from "@/components/landing/ArchitectureSection";
 import EcosystemSection from "@/components/landing/EcosystemSection";
 import FAQSection from "@/components/landing/FAQSection";
 import Footer from "@/components/landing/Footer";
@@ -30,6 +31,7 @@ const Index = () => {
         <ComparisonTable />
         <RoadmapTimeline />
         <WhyItMatters />
+        <ArchitectureSection />
         <EcosystemSection />
         <FAQSection />
       </main>
