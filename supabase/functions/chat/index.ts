@@ -277,12 +277,69 @@ async function executeDeepResearch(query: string, userId: string): Promise<strin
   return `## Web Results\n\n${webResults}\n\n---\n\n## Knowledge Base Results\n\n${kbResults}`;
 }
 
+async function executeStoreMemory(key: string, value: string, category: string, userId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { error } = await adminClient
+      .from("user_memory")
+      .upsert({ user_id: userId, key, value, category: category || "general" }, { onConflict: "user_id,key" });
+    if (error) return `Failed to store memory: ${error.message}`;
+    return `Memory stored: "${key}" = "${value}" (${category || "general"})`;
+  } catch (e) {
+    return `Memory store error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeRecallMemory(category: string | undefined, userId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    let query = adminClient.from("user_memory").select("key, value, category, updated_at").eq("user_id", userId);
+    if (category) query = query.eq("category", category);
+    const { data, error } = await query.order("updated_at", { ascending: false }).limit(50);
+    if (error) return `Failed to recall memories: ${error.message}`;
+    if (!data || data.length === 0) return "No memories stored yet for this user.";
+    return data.map((m: any) => `[${m.category}] ${m.key}: ${m.value}`).join("\n");
+  } catch (e) {
+    return `Memory recall error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeBrowsePage(url: string): Promise<string> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) return "Browser control is not configured. FIRECRAWL_API_KEY is missing.";
+  try {
+    let formattedUrl = url.trim();
+    if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
+      formattedUrl = `https://${formattedUrl}`;
+    }
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: formattedUrl, formats: ["markdown"], onlyMainContent: true }),
+    });
+    const data = await response.json();
+    if (!response.ok) return `Browse failed: ${data.error || response.status}`;
+    const markdown = data.data?.markdown || data.markdown || "";
+    if (!markdown) return "Page returned no content.";
+    return markdown.slice(0, 5000);
+  } catch (e) {
+    return `Browse error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
 async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
     case "generate_image": return await executeImageGeneration(args.prompt);
     case "search_knowledge": return await executeKnowledgeSearch(args.query, userId);
     case "deep_research": return await executeDeepResearch(args.query, userId);
+    case "store_memory": return await executeStoreMemory(args.key, args.value, args.category, userId);
+    case "recall_memory": return await executeRecallMemory(args.category, userId);
+    case "browse_page": return await executeBrowsePage(args.url);
     default: return `Unknown tool: ${name}`;
   }
 }
