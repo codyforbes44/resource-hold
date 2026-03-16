@@ -187,11 +187,11 @@ async function executeKnowledgeSearch(query: string, userId: string, lovableApiK
   }
 }
 
-async function executeTool(name: string, args: Record<string, any>, lovableApiKey: string): Promise<string> {
+async function executeTool(name: string, args: Record<string, any>, lovableApiKey: string, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
     case "generate_image": return await executeImageGeneration(args.prompt, lovableApiKey);
-    case "search_knowledge": return await executeKnowledgeSearch(args.query);
+    case "search_knowledge": return await executeKnowledgeSearch(args.query, userId, lovableApiKey);
     default: return `Unknown tool: ${name}`;
   }
 }
