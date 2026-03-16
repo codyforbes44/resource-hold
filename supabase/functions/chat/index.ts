@@ -457,11 +457,22 @@ serve(async (req) => {
       if (SKILL_TOOLS[skillId]) tools.push(SKILL_TOOLS[skillId]);
     }
 
+    // Build memory context
+    let memoryContext = "";
+    if (enabledSkills.includes("memory") && userId) {
+      const memories = await executeRecallMemory(undefined, userId);
+      if (memories && !memories.startsWith("No memories")) {
+        memoryContext = `\n\nUser memories (use these to personalize responses):\n${memories}`;
+      }
+    }
+
     const systemPrompt = `You are gClaw, an enterprise AI assistant built on the OpenClaw agent orchestration protocol. You are helpful, knowledgeable, and concise. Format responses with markdown when appropriate. Use fenced code blocks with language identifiers for code.
 
 ${tools.length > 0 ? "You have access to tools/skills. Use them when they would help answer the user's question." : ""}
+${enabledSkills.includes("memory") ? "\nYou can remember user preferences across sessions. Proactively store important user context (name, preferences, projects, etc.) using store_memory. Use recall_memory at the start to personalize." : ""}
+${enabledSkills.includes("browser") ? "\nYou can browse specific web pages to extract their full content. Use browse_page when the user asks about a specific URL or when you need detailed content from a page." : ""}
 
-When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.`;
+When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.${memoryContext}`;
 
     const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
