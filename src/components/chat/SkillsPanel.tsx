@@ -52,6 +52,15 @@ const DEFAULT_SKILLS: Skill[] = [
     badge: "RAG",
     color: "hsl(var(--gclaw-red))",
   },
+  {
+    id: "deep_research",
+    name: "Deep Research",
+    description: "Chains web search with knowledge base for comprehensive, multi-source research answers.",
+    icon: FlaskConical,
+    enabled: false,
+    badge: "Multi-Source",
+    color: "hsl(270 70% 60%)",
+  },
 ];
 
 interface SkillsPanelProps {

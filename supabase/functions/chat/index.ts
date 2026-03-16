@@ -225,11 +225,21 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
   }
 }
 
+async function executeDeepResearch(query: string, userId: string): Promise<string> {
+  const [webResults, kbResults] = await Promise.all([
+    executeWebSearch(query),
+    executeKnowledgeSearch(query, userId),
+  ]);
+
+  return `## Web Results\n\n${webResults}\n\n---\n\n## Knowledge Base Results\n\n${kbResults}`;
+}
+
 async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
     case "generate_image": return await executeImageGeneration(args.prompt);
     case "search_knowledge": return await executeKnowledgeSearch(args.query, userId);
+    case "deep_research": return await executeDeepResearch(args.query, userId);
     default: return `Unknown tool: ${name}`;
   }
 }
