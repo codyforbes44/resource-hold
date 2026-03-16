@@ -254,6 +254,9 @@ function validateModel(model: string): string {
     "openai/gpt-5",
     "openai/gpt-5-nano",
     "openai/gpt-5.2",
+    "zephel/zephel",
+    "zephel/zephel-pro",
+    "zephel/zephel-fast",
   ];
   return ALLOWED_MODELS.includes(model) ? model : "google/gemini-3-flash-preview";
 }

@@ -58,6 +58,9 @@ const MODELS = [
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
   { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
   { value: "openai/gpt-5", label: "GPT-5" },
+  { value: "zephel/zephel", label: "Zephel" },
+  { value: "zephel/zephel-pro", label: "Zephel Pro" },
+  { value: "zephel/zephel-fast", label: "Zephel Fast" },
 ];
 
 const SUGGESTED_PROMPTS = [
