@@ -59,6 +59,7 @@ interface SkillsPanelProps {
   onClose: () => void;
   skills: Skill[];
   onToggleSkill: (id: string) => void;
+  knowledgeBasePanel?: React.ReactNode;
 }
 
 const SkillsPanel = ({ open, onClose, skills, onToggleSkill }: SkillsPanelProps) => {
