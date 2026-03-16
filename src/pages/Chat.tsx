@@ -644,6 +644,7 @@ const Chat = () => {
                 setConversations((prev) => [conv, ...prev]);
               }}
             />
+            </Suspense>
           </div>
         ) : (
           <>
