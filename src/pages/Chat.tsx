@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,11 +13,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { toast } from "sonner";
-import { Plus, Send, Trash2, LogOut, Mic, Home, PanelLeftClose, PanelLeft, Sparkles } from "lucide-react";
+import {
+  Plus,
+  Send,
+  Trash2,
+  LogOut,
+  Mic,
+  Home,
+  PanelLeftClose,
+  PanelLeft,
+  Sparkles,
+  Copy,
+  RotateCcw,
+  Search,
+  Settings,
+  ShieldCheck,
+  Check,
+  Pencil,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import VoiceAgent from "@/components/chat/VoiceAgent";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
+import ThemeToggle from "@/components/ThemeToggle";
+import { useUserRole } from "@/hooks/useUserRole";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -30,10 +56,20 @@ const MODELS = [
   { value: "openai/gpt-5", label: "GPT-5" },
 ];
 
+const SUGGESTED_PROMPTS = [
+  "Explain quantum computing in simple terms",
+  "Write a Python function to sort a list",
+  "What are the latest trends in AI?",
+  "Help me brainstorm a startup idea",
+  "Summarize the key points of machine learning",
+];
+
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const Chat = () => {
   const { user, loading: authLoading, signOut } = useAuth();
+  const { isAdmin } = useUserRole();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<string | null>(null);
@@ -45,8 +81,13 @@ const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [skillsPanelOpen, setSkillsPanelOpen] = useState(false);
   const [skills, setSkills] = useState<Skill[]>(DEFAULT_SKILLS);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editingConvId, setEditingConvId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const enabledSkillIds = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
 
@@ -60,16 +101,23 @@ const Chat = () => {
     if (!authLoading && !user) navigate("/auth");
   }, [user, authLoading, navigate]);
 
+  // Load user's default model from settings
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_settings")
+      .select("default_model")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.default_model) setModel(data.default_model);
+      });
+  }, [user]);
+
   // Auto-close sidebar on mobile
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
-      if (e.matches) setSidebarOpen(false);
-    };
-    handler(mq);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+    if (isMobile) setSidebarOpen(false);
+  }, [isMobile]);
 
   // Load conversations
   useEffect(() => {
@@ -81,6 +129,28 @@ const Chat = () => {
       .then(({ data }) => {
         if (data) setConversations(data as Conversation[]);
       });
+
+    // Realtime subscription for conversation updates
+    const channel = supabase
+      .channel("conversations-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        () => {
+          supabase
+            .from("conversations")
+            .select("*")
+            .order("updated_at", { ascending: false })
+            .then(({ data }) => {
+              if (data) setConversations(data as Conversation[]);
+            });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   // Load messages when conversation changes
@@ -131,32 +201,65 @@ const Chat = () => {
     }
   };
 
-  const selectConversation = (id: string) => {
-    setActiveConv(id);
-    if (window.innerWidth < 768) setSidebarOpen(false);
+  const renameConversation = async (id: string) => {
+    if (!editTitle.trim()) return;
+    await supabase.from("conversations").update({ title: editTitle.trim() }).eq("id", id);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title: editTitle.trim() } : c))
+    );
+    setEditingConvId(null);
   };
 
-  const send = useCallback(async () => {
-    if (!input.trim() || isStreaming) return;
-    const userMsg: Msg = { role: "user", content: input.trim() };
-    setInput("");
+  const selectConversation = (id: string) => {
+    setActiveConv(id);
+    if (isMobile) setSidebarOpen(false);
+  };
 
-    let convId = activeConv;
-    if (!convId) {
-      convId = await createConversation();
-      if (!convId) return;
+  const copyMessage = (content: string, idx: number) => {
+    navigator.clipboard.writeText(content);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const deleteMessage = async (idx: number) => {
+    if (!activeConv) return;
+    // Delete from DB by finding the message
+    const { data } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("conversation_id", activeConv)
+      .order("created_at", { ascending: true });
+    if (data && data[idx]) {
+      await supabase.from("messages").delete().eq("id", data[idx].id);
+    }
+    setMessages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const regenerateMessage = async (idx: number) => {
+    if (isStreaming || !activeConv) return;
+    // Find the last user message before this assistant message
+    const userMessages = messages.slice(0, idx).filter((m) => m.role === "user");
+    if (userMessages.length === 0) return;
+
+    // Remove from this index onwards
+    const trimmedMessages = messages.slice(0, idx);
+    setMessages(trimmedMessages);
+
+    // Delete the assistant message from DB
+    const { data } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("conversation_id", activeConv)
+      .order("created_at", { ascending: true });
+    if (data) {
+      const toDelete = data.slice(idx);
+      for (const m of toDelete) {
+        await supabase.from("messages").delete().eq("id", m.id);
+      }
     }
 
-    await supabase.from("messages").insert({
-      conversation_id: convId,
-      role: "user",
-      content: userMsg.content,
-    });
-
-    const allMessages = [...messages, userMsg];
-    setMessages(allMessages);
+    // Re-send
     setIsStreaming(true);
-
     let assistantSoFar = "";
     const controller = new AbortController();
     abortRef.current = controller;
@@ -168,25 +271,11 @@ const Chat = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({
-          messages: allMessages,
-          model,
-          skills: enabledSkillIds,
-        }),
+        body: JSON.stringify({ messages: trimmedMessages, model, skills: enabledSkillIds }),
         signal: controller.signal,
       });
 
-      if (resp.status === 429) {
-        toast.error("Rate limit exceeded. Please try again later.");
-        setIsStreaming(false);
-        return;
-      }
-      if (resp.status === 402) {
-        toast.error("Credits required. Please add funds in Settings → Workspace → Usage.");
-        setIsStreaming(false);
-        return;
-      }
-      if (!resp.ok || !resp.body) throw new Error("Failed to start stream");
+      if (!resp.ok || !resp.body) throw new Error("Failed to regenerate");
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -196,19 +285,17 @@ const Chat = () => {
         const { done, value } = await reader.read();
         if (done) break;
         textBuffer += decoder.decode(value, { stream: true });
-
         let newlineIndex: number;
         while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
           let line = textBuffer.slice(0, newlineIndex);
           textBuffer = textBuffer.slice(newlineIndex + 1);
           if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
           if (!line.startsWith("data: ")) continue;
           const jsonStr = line.slice(6).trim();
           if (jsonStr === "[DONE]") break;
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantSoFar += content;
               setMessages((prev) => {
@@ -222,7 +309,6 @@ const Chat = () => {
               });
             }
           } catch {
-            textBuffer = line + "\n" + textBuffer;
             break;
           }
         }
@@ -230,41 +316,171 @@ const Chat = () => {
 
       if (assistantSoFar) {
         await supabase.from("messages").insert({
-          conversation_id: convId,
+          conversation_id: activeConv,
           role: "assistant",
           content: assistantSoFar,
           model,
         });
-        if (allMessages.length === 1) {
-          const title = userMsg.content.slice(0, 60);
-          await supabase.from("conversations").update({ title }).eq("id", convId);
-          setConversations((prev) =>
-            prev.map((c) => (c.id === convId ? { ...c, title } : c))
-          );
-        }
       }
     } catch (err: any) {
-      if (err.name !== "AbortError") {
-        toast.error("Failed to get response");
-        console.error(err);
-      }
+      if (err.name !== "AbortError") toast.error("Regeneration failed");
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [input, isStreaming, activeConv, messages, model, user, enabledSkillIds]);
+  };
+
+  const send = useCallback(
+    async (overrideInput?: string) => {
+      const text = (overrideInput || input).trim();
+      if (!text || isStreaming) return;
+      const userMsg: Msg = { role: "user", content: text };
+      if (!overrideInput) setInput("");
+
+      let convId = activeConv;
+      if (!convId) {
+        convId = await createConversation();
+        if (!convId) return;
+      }
+
+      await supabase.from("messages").insert({
+        conversation_id: convId,
+        role: "user",
+        content: userMsg.content,
+      });
+
+      const allMessages = [...messages, userMsg];
+      setMessages(allMessages);
+      setIsStreaming(true);
+
+      let assistantSoFar = "";
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const resp = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: allMessages,
+            model,
+            skills: enabledSkillIds,
+          }),
+          signal: controller.signal,
+        });
+
+        if (resp.status === 429) {
+          toast.error("Rate limit exceeded. Please try again later.");
+          setIsStreaming(false);
+          return;
+        }
+        if (resp.status === 402) {
+          toast.error("Credits required.");
+          setIsStreaming(false);
+          return;
+        }
+        if (!resp.ok || !resp.body) throw new Error("Failed to start stream");
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let textBuffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          textBuffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+              if (content) {
+                assistantSoFar += content;
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last?.role === "assistant") {
+                    return prev.map((m, i) =>
+                      i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
+                    );
+                  }
+                  return [...prev, { role: "assistant", content: assistantSoFar }];
+                });
+              }
+            } catch {
+              textBuffer = line + "\n" + textBuffer;
+              break;
+            }
+          }
+        }
+
+        if (assistantSoFar) {
+          await supabase.from("messages").insert({
+            conversation_id: convId,
+            role: "assistant",
+            content: assistantSoFar,
+            model,
+          });
+          // Auto-title with AI after first exchange
+          if (allMessages.length === 1) {
+            const title = userMsg.content.slice(0, 60);
+            await supabase.from("conversations").update({ title }).eq("id", convId);
+            setConversations((prev) =>
+              prev.map((c) => (c.id === convId ? { ...c, title } : c))
+            );
+          }
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          toast.error("Failed to get response");
+          console.error(err);
+        }
+      } finally {
+        setIsStreaming(false);
+        abortRef.current = null;
+      }
+    },
+    [input, isStreaming, activeConv, messages, model, user, enabledSkillIds]
+  );
 
   if (authLoading)
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
 
   const activeSkillCount = skills.filter((s) => s.enabled).length;
 
+  const filteredConversations = conversations.filter(
+    (c) => !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Skills panel content (shared between desktop panel and mobile drawer)
+  const skillsPanelContent = (
+    <SkillsPanel
+      open={true}
+      onClose={() => setSkillsPanelOpen(false)}
+      skills={skills}
+      onToggleSkill={toggleSkill}
+    />
+  );
+
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-[100dvh] bg-background">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -294,13 +510,25 @@ const Chat = () => {
             <PanelLeftClose className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-2">
+
+        <div className="p-2 space-y-2">
           <Button variant="outline" className="w-full justify-start gap-2" onClick={createConversation}>
             <Plus className="h-4 w-4" /> New Chat
           </Button>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search chats..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-xs"
+            />
+          </div>
         </div>
+
         <ScrollArea className="flex-1 px-2">
-          {conversations.map((c) => (
+          {filteredConversations.map((c) => (
             <div
               key={c.id}
               className={`group mb-1 flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
@@ -308,23 +536,63 @@ const Chat = () => {
               }`}
               onClick={() => selectConversation(c.id)}
             >
-              <span className="truncate">{c.title}</span>
-              <button
-                className="hidden text-muted-foreground hover:text-destructive group-hover:block"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteConversation(c.id);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              {editingConvId === c.id ? (
+                <form
+                  className="flex-1 flex gap-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    renameConversation(c.id);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="h-6 text-xs"
+                    autoFocus
+                    onBlur={() => renameConversation(c.id)}
+                  />
+                </form>
+              ) : (
+                <span className="truncate flex-1">{c.title}</span>
+              )}
+              <div className="hidden items-center gap-1 group-hover:flex">
+                <button
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingConvId(c.id);
+                    setEditTitle(c.title);
+                  }}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteConversation(c.id);
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
             </div>
           ))}
         </ScrollArea>
+
         <div className="border-t border-border p-2 space-y-1">
           <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/")}>
             <Home className="h-4 w-4" /> Home
           </Button>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/settings")}>
+            <Settings className="h-4 w-4" /> Settings
+          </Button>
+          {isAdmin && (
+            <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/admin")}>
+              <ShieldCheck className="h-4 w-4" /> Admin
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -350,7 +618,7 @@ const Chat = () => {
             </button>
           )}
           <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="w-[160px] md:w-[200px]">
+            <SelectTrigger className="w-[140px] md:w-[200px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -362,10 +630,11 @@ const Chat = () => {
             </SelectContent>
           </Select>
           <div className="flex-1" />
+          <ThemeToggle className="hidden sm:flex" />
           <Button
             variant={skillsPanelOpen ? "default" : "outline"}
             size="sm"
-            className="gap-2"
+            className="gap-1.5"
             onClick={() => setSkillsPanelOpen(!skillsPanelOpen)}
           >
             <Sparkles className="h-4 w-4" />
@@ -376,9 +645,9 @@ const Chat = () => {
               </span>
             )}
           </Button>
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowVoice(!showVoice)}>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowVoice(!showVoice)}>
             <Mic className="h-4 w-4" />
-            <span className="hidden sm:inline">{showVoice ? "Hide Voice" : "Voice Agent"}</span>
+            <span className="hidden sm:inline">{showVoice ? "Hide" : "Voice"}</span>
           </Button>
         </div>
 
@@ -399,8 +668,23 @@ const Chat = () => {
                   <p className="text-lg text-muted-foreground">Start a conversation with gClaw</p>
                   <p className="max-w-md text-sm text-muted-foreground/60">
                     Choose a model above and type a message below. Enable skills via the{" "}
-                    <Sparkles className="inline h-3.5 w-3.5" /> button to give gClaw superpowers.
+                    <Sparkles className="inline h-3.5 w-3.5" /> button.
                   </p>
+                  {/* Suggested prompts */}
+                  <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-lg">
+                    {SUGGESTED_PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt}
+                        onClick={() => {
+                          setInput(prompt);
+                          setTimeout(() => send(prompt), 0);
+                        }}
+                        className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
                   {/* Skill chips */}
                   <div className="flex flex-wrap justify-center gap-2 mt-2">
                     {skills.map((s) => (
@@ -421,24 +705,62 @@ const Chat = () => {
                 </div>
               )}
               {messages.map((msg, i) => (
-                <div key={i} className={`mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[90%] md:max-w-[80%] rounded-xl px-4 py-3 text-sm ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    }`}
-                  >
-                    {msg.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none [&_img]:rounded-lg [&_img]:max-h-96 [&_img]:w-auto">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      msg.content
-                    )}
+                <div key={i} className={`group mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className="relative">
+                    <div
+                      className={`max-w-[90%] md:max-w-[80%] rounded-xl px-4 py-3 text-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground"
+                      }`}
+                    >
+                      {msg.role === "assistant" ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none [&_img]:rounded-lg [&_img]:max-h-96 [&_img]:w-auto [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-lg [&_code]:text-xs">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
+                    {/* Message actions */}
+                    <div className="absolute -bottom-6 right-0 hidden items-center gap-1 group-hover:flex">
+                      <button
+                        onClick={() => copyMessage(msg.content, i)}
+                        className="flex h-6 w-6 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
+                        title="Copy"
+                      >
+                        {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      </button>
+                      {msg.role === "assistant" && (
+                        <button
+                          onClick={() => regenerateMessage(i)}
+                          className="flex h-6 w-6 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
+                          title="Regenerate"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteMessage(i)}
+                        className="flex h-6 w-6 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-destructive"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
+              {/* Typing indicator */}
+              {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
+                <div className="mb-4 flex justify-start">
+                  <div className="flex items-center gap-1 rounded-xl bg-muted px-4 py-3">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce" />
+                  </div>
+                </div>
+              )}
               <div ref={scrollRef} />
             </ScrollArea>
 
@@ -447,7 +769,7 @@ const Chat = () => {
               <div className="flex items-center gap-2 border-t border-border/50 px-4 py-1.5 bg-primary/5">
                 <Sparkles className="h-3 w-3 text-primary" />
                 <span className="text-[11px] text-muted-foreground">
-                  Active skills:{" "}
+                  Active:{" "}
                   {skills
                     .filter((s) => s.enabled)
                     .map((s) => s.name)
@@ -457,7 +779,7 @@ const Chat = () => {
             )}
 
             {/* Input */}
-            <div className="border-t border-border p-3 md:p-4">
+            <div className="border-t border-border p-3 md:p-4 pb-[env(safe-area-inset-bottom,12px)]">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -466,17 +788,18 @@ const Chat = () => {
                 className="flex gap-2"
               >
                 <Input
+                  ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={
                     enabledSkillIds.length > 0
-                      ? "Ask anything — skills are active..."
+                      ? "Ask anything — skills active..."
                       : "Type a message..."
                   }
                   disabled={isStreaming}
-                  className="flex-1"
+                  className="flex-1 min-h-[44px]"
                 />
-                <Button type="submit" disabled={isStreaming || !input.trim()}>
+                <Button type="submit" disabled={isStreaming || !input.trim()} className="min-h-[44px] min-w-[44px]">
                   <Send className="h-4 w-4" />
                 </Button>
               </form>
@@ -485,13 +808,57 @@ const Chat = () => {
         )}
       </div>
 
-      {/* Skills Panel */}
-      <SkillsPanel
-        open={skillsPanelOpen}
-        onClose={() => setSkillsPanelOpen(false)}
-        skills={skills}
-        onToggleSkill={toggleSkill}
-      />
+      {/* Skills Panel — Desktop: side panel, Mobile: bottom drawer */}
+      {isMobile ? (
+        <Drawer open={skillsPanelOpen} onOpenChange={setSkillsPanelOpen}>
+          <DrawerContent className="max-h-[85dvh]">
+            <DrawerHeader>
+              <DrawerTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                OpenClaw Skills
+              </DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-6">
+              <div className="space-y-2">
+                {skills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    className="flex items-center justify-between rounded-lg border border-border p-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+                        style={{ backgroundColor: `${skill.color}20` }}
+                      >
+                        <skill.icon className="h-4 w-4" style={{ color: skill.color }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{skill.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{skill.description}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant={skill.enabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleSkill(skill.id)}
+                      className="shrink-0 ml-2"
+                    >
+                      {skill.enabled ? "On" : "Off"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <SkillsPanel
+          open={skillsPanelOpen}
+          onClose={() => setSkillsPanelOpen(false)}
+          skills={skills}
+          onToggleSkill={toggleSkill}
+        />
+      )}
     </div>
   );
 };
