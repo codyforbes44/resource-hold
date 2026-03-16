@@ -637,6 +637,7 @@ const Chat = () => {
                 <span className="font-mono font-semibold text-sm">Voice Agent</span>
               </div>
             )}
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
             <VoiceAgent
               userId={user!.id}
               onConversationSaved={(conv) => {
