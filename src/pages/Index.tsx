@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import OverviewSection from "@/components/landing/OverviewSection";
 import FeaturesGrid from "@/components/landing/FeaturesGrid";
 import PartnersSection from "@/components/landing/PartnersSection";
-import ComparisonTable from "@/components/landing/ComparisonTable";
 import RoadmapTimeline from "@/components/landing/RoadmapTimeline";
 import WhyItMatters from "@/components/landing/WhyItMatters";
 import ArchitectureSection from "@/components/landing/ArchitectureSection";
