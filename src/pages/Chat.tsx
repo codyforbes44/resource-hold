@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,16 +38,16 @@ import {
   Check,
   Pencil,
 } from "lucide-react";
-import { lazy, Suspense } from "react";
-const VoiceAgent = lazy(() => import("@/components/chat/VoiceAgent"));
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
-const MarkdownRenderer = lazy(() => import("@/components/chat/MarkdownRenderer"));
-const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePanel"));
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
 import { getAccessToken } from "@/lib/supabase-helpers";
 import logoSrc from "@/assets/logo-gclaw.png";
+
+const VoiceAgent = lazy(() => import("@/components/chat/VoiceAgent"));
+const MarkdownRenderer = lazy(() => import("@/components/chat/MarkdownRenderer"));
+const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePanel"));
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
