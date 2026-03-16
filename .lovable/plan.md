@@ -1,27 +1,30 @@
 
-## Confirmation: codyforbes@gmail.com is Already Site Administrator
 
-**Status**: The admin role for `codyforbes@gmail.com` is already assigned in the database (verified via query). No further database changes needed.
+## Plan: Grey Out Incompatible Models Based on Active Skills
 
-## Current Feature Status — All Implemented
+### Concept
+Define a compatibility map between skills and models. When a user enables a skill, models that don't support that skill well get visually greyed out and become unselectable in the model dropdown.
 
-### 1. Admin Dashboard (`/admin`) — 5 tabs
-- **Users**: Search, assign/revoke roles (admin, moderator, user)
-- **Models**: Global model access with per-provider grouping (Google, OpenAI, Zephel), toggle switches for "Users" and "Visitors" access per model
-- **Chats**: Searchable conversation list with message counts
-- **Audit**: Full audit log with metadata
-- **System**: Stats cards + Recharts bar chart
+### Skill-Model Compatibility Map
+A constant mapping which skills each model supports well:
 
-### 2. Model Access Control — Fully Wired
-- `model_access_defaults` table seeded with all 12 models, RLS in place
-- `user_model_overrides` table with admin-only write, user read-own RLS
-- Admin UI: Global toggles (enabled/visitor_enabled) + per-user Grant/Revoke/Reset buttons
-- Chat page filters `MODEL_GROUPS` based on user permissions or visitor access
-- Backend `chat` edge function enforces access before processing requests
+- **Web Search**: All models support it (tool calling is handled server-side)
+- **Image Generation**: Only Gemini image-capable models (e.g., `gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.1-pro-preview`) — exclude `flash-lite`, all OpenAI, all Zephel
+- **Knowledge Base (RAG)**: All models that support tool calling well — exclude `flash-lite`, `gpt-5-nano`, `zephel-fast`
+- **Code Interpreter**: All models (built-in, no tool call needed)
 
-### 3. UI Quality
-- Provider-colored section badges, mono model IDs, Switch toggles with icon labels
-- Card-based layout, responsive grid, scroll areas, search inputs
-- Toast notifications on all actions, loading spinners, role badges in header
+### Changes
 
-**No changes are required** — everything the request describes is already built and functional. You can verify by navigating to `/admin` in the preview.
+**`src/pages/Chat.tsx`** (single file change):
+
+1. Add a `MODEL_SKILL_COMPAT` constant mapping each model to an array of supported skill IDs
+2. Compute `incompatibleModels` from currently enabled skills — a model is incompatible if ANY enabled skill is not in its supported list
+3. In the `MODEL_GROUPS` derivation, keep all allowed models but add an `isDisabled` flag
+4. In the `<SelectItem>` render, apply `disabled` prop and grey-out styling (`opacity-40 cursor-not-allowed`) for incompatible models
+5. If the currently selected model becomes incompatible, auto-switch to the first compatible model with a toast notification
+
+### UI Behavior
+- Greyed-out models remain visible with reduced opacity and a subtle tooltip/title explaining why
+- Selecting a greyed model is blocked (`disabled` on SelectItem)
+- Auto-switch only triggers when the current model becomes incompatible after toggling a skill
+
