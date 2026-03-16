@@ -18,7 +18,12 @@ const MAX_HISTORY_MESSAGES = 50;
 function getApiConfig(model: string): { url: string; apiKey: string; modelName: string } {
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  const zephelKey = Deno.env.get("ZEPHEL_API_KEY");
 
+  if (model.startsWith("zephel/")) {
+    if (!zephelKey) throw new Error("ZEPHEL_API_KEY is not configured");
+    return { url: ZEPHEL_ENDPOINT, apiKey: zephelKey, modelName: model.replace("zephel/", "") };
+  }
   if (model.startsWith("openai/")) {
     if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
     return { url: OPENAI_ENDPOINT, apiKey: openaiKey, modelName: model.replace("openai/", "") };
