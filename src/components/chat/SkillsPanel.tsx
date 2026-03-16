@@ -119,6 +119,8 @@ const SkillsPanel = ({ open, onClose, skills, onToggleSkill, knowledgeBasePanel 
         </div>
       </ScrollArea>
 
+      {knowledgeBasePanel}
+
       <div className="border-t border-border p-3">
         <p className="text-[10px] text-muted-foreground text-center">
           Skills extend gClaw's capabilities via the OpenClaw plugin protocol.
