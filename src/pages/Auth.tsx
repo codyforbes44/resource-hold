@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { signUpSchema, signInSchema, getPasswordStrength } from "@/lib/validations";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 const Auth = () => {
@@ -15,6 +15,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -22,8 +23,25 @@ const Auth = () => {
     if (user) navigate("/chat");
   }, [user, navigate]);
 
+  const strength = isSignUp ? getPasswordStrength(password) : null;
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+
+    const schema = isSignUp ? signUpSchema : signInSchema;
+    const result = schema.safeParse({ email, password });
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setLoading(true);
     try {
       if (isSignUp) {
@@ -99,7 +117,9 @@ const Auth = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className={errors.email ? "border-destructive" : ""}
             />
+            {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -110,8 +130,26 @@ const Auth = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              className={errors.password ? "border-destructive" : ""}
             />
+            {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+            {isSignUp && password.length > 0 && strength && (
+              <div className="space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors ${
+                        i <= strength.score ? strength.color : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Password strength: <span className="font-medium">{strength.label}</span>
+                </p>
+              </div>
+            )}
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
@@ -142,7 +180,7 @@ const Auth = () => {
         <p className="text-center text-sm text-muted-foreground">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => { setIsSignUp(!isSignUp); setErrors({}); }}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
             {isSignUp ? "Sign In" : "Sign Up"}
