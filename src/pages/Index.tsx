@@ -31,7 +31,7 @@ const Index = () => {
         <FeaturesGrid />
         <ArchitectureSection />
         <WhyItMatters />
-        <RoadmapTimeline />
+        
         <EcosystemSection />
         <PressSection />
         <CommunityLinks />
