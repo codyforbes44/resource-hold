@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Code, ImageIcon, BookOpen, X, Sparkles } from "lucide-react";
+import { Search, Code, ImageIcon, BookOpen, FlaskConical, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +51,15 @@ const DEFAULT_SKILLS: Skill[] = [
     enabled: false,
     badge: "RAG",
     color: "hsl(var(--gclaw-red))",
+  },
+  {
+    id: "deep_research",
+    name: "Deep Research",
+    description: "Chains web search with knowledge base for comprehensive, multi-source research answers.",
+    icon: FlaskConical,
+    enabled: false,
+    badge: "Multi-Source",
+    color: "hsl(270 70% 60%)",
   },
 ];
 

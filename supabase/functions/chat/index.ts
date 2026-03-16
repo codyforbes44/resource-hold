@@ -72,6 +72,18 @@ const SKILL_TOOLS: Record<string, any> = {
       },
     },
   },
+  deep_research: {
+    type: "function",
+    function: {
+      name: "deep_research",
+      description: "Perform comprehensive research by searching both the web and the knowledge base simultaneously. Use this for thorough, multi-source answers.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "The research query" } },
+        required: ["query"],
+      },
+    },
+  },
 };
 
 // ── Tool executors ──
@@ -213,11 +225,21 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
   }
 }
 
+async function executeDeepResearch(query: string, userId: string): Promise<string> {
+  const [webResults, kbResults] = await Promise.all([
+    executeWebSearch(query),
+    executeKnowledgeSearch(query, userId),
+  ]);
+
+  return `## Web Results\n\n${webResults}\n\n---\n\n## Knowledge Base Results\n\n${kbResults}`;
+}
+
 async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
     case "generate_image": return await executeImageGeneration(args.prompt);
     case "search_knowledge": return await executeKnowledgeSearch(args.query, userId);
+    case "deep_research": return await executeDeepResearch(args.query, userId);
     default: return `Unknown tool: ${name}`;
   }
 }
@@ -408,6 +430,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         fnName === "web_search" ? "🔍 Searching the web..."
         : fnName === "generate_image" ? "🎨 Generating image..."
         : fnName === "search_knowledge" ? "📚 Searching knowledge base..."
+        : fnName === "deep_research" ? "🔬 Researching across web & knowledge base..."
         : `⚡ Running ${fnName}...`;
       toolStatusChunks.push(
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
