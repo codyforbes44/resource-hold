@@ -162,7 +162,17 @@ export const FEATURES: Feature[] = [
   {
     icon: Workflow,
     title: "gClaw Skills",
-    desc: "Modular skill system: Web Search, Image Generation, Knowledge Base, and Code Interpreter — each toggleable per session.",
+    desc: "Modular skill system: Web Search, Image Gen, Knowledge Base, Code Interpreter, Memory, Browser Control, and Deep Research — each toggleable per session.",
+  },
+  {
+    icon: Brain,
+    title: "Persistent Memory",
+    desc: "Remembers you across sessions. Preferences, context, and important details are stored and recalled automatically.",
+  },
+  {
+    icon: Globe,
+    title: "Browser Control",
+    desc: "Browse any URL, extract content as markdown, and use it as context. Powered by Firecrawl scraping.",
   },
 ];
 
