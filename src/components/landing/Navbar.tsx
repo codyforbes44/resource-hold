@@ -46,7 +46,8 @@ const Navbar = () => {
     >
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center text-xl font-bold">
+        <a href="#" className="flex items-center gap-2 text-xl font-bold">
+          <img src={logoGclaw} alt="gClaw" className="h-8 w-8" />
           <span className="font-mono tracking-tight"><span className="text-foreground">&gt; g</span><span className="text-gradient-brand">Claw</span><span className="ml-0.5 inline-block w-[2px] h-[1.1em] bg-primary align-middle animate-[blink_1s_step-end_infinite]" /></span>
         </a>
 
