@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Code, ImageIcon, BookOpen, X, Sparkles } from "lucide-react";
+import { Search, Code, ImageIcon, BookOpen, FlaskConical, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
