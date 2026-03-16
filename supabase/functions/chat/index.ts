@@ -72,6 +72,18 @@ const SKILL_TOOLS: Record<string, any> = {
       },
     },
   },
+  deep_research: {
+    type: "function",
+    function: {
+      name: "deep_research",
+      description: "Perform comprehensive research by searching both the web and the knowledge base simultaneously. Use this for thorough, multi-source answers.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "The research query" } },
+        required: ["query"],
+      },
+    },
+  },
 };
 
 // ── Tool executors ──
