@@ -520,7 +520,47 @@ When you use a tool and get results, synthesize the information into a helpful r
       );
     }
 
-    const initialData = await initialResponse.json();
+    const initialText = await initialResponse.text();
+    let initialData: any;
+    try {
+      // Handle SSE-formatted responses (some providers return SSE even for non-streaming requests)
+      if (initialText.startsWith("data: ") || initialText.startsWith(":")) {
+        const lines = initialText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
+        const chunks = lines.map(l => {
+          try { return JSON.parse(l.slice(6)); } catch { return null; }
+        }).filter(Boolean);
+        // Combine SSE chunks into a single response
+        if (chunks.length > 0) {
+          const combinedContent = chunks
+            .map((c: any) => c.choices?.[0]?.delta?.content || c.choices?.[0]?.message?.content || "")
+            .join("");
+          const toolCalls = chunks
+            .map((c: any) => c.choices?.[0]?.delta?.tool_calls || c.choices?.[0]?.message?.tool_calls)
+            .filter(Boolean)
+            .flat();
+          initialData = {
+            choices: [{
+              message: {
+                content: combinedContent,
+                tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+              },
+            }],
+          };
+        } else {
+          throw new Error("No parseable data in SSE response");
+        }
+      } else {
+        initialData = JSON.parse(initialText);
+      }
+    } catch (parseErr) {
+      console.error("Failed to parse API response:", initialText.slice(0, 200));
+      // Fall back: return the raw text as assistant content
+      const fallbackContent = initialText.replace(/^data:\s*/gm, "").replace(/\[DONE\]/g, "").trim();
+      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackContent || "Sorry, I encountered an error processing the response." } }] })}\n\ndata: [DONE]\n\n`;
+      return new Response(sseData, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
     const choice = initialData.choices?.[0];
 
     if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
