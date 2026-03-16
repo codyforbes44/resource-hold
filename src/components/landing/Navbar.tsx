@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { NAV_LINKS } from "@/constants/landing";
+import { useAuth } from "@/hooks/useAuth";
+import ThemeToggle from "@/components/ThemeToggle";
 import logoGclaw from "@/assets/logo-gclaw.png";
 
 const Navbar = () => {
