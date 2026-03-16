@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+const ZEPHEL_ENDPOINT = "https://nvfszndwhgtjlxtclowb.supabase.co/functions/v1/external-chat";
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
 
@@ -17,7 +18,12 @@ const MAX_HISTORY_MESSAGES = 50;
 function getApiConfig(model: string): { url: string; apiKey: string; modelName: string } {
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  const zephelKey = Deno.env.get("ZEPHEL_API_KEY");
 
+  if (model.startsWith("zephel/")) {
+    if (!zephelKey) throw new Error("ZEPHEL_API_KEY is not configured");
+    return { url: ZEPHEL_ENDPOINT, apiKey: zephelKey, modelName: model.replace("zephel/", "") };
+  }
   if (model.startsWith("openai/")) {
     if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
     return { url: OPENAI_ENDPOINT, apiKey: openaiKey, modelName: model.replace("openai/", "") };
@@ -248,6 +254,9 @@ function validateModel(model: string): string {
     "openai/gpt-5",
     "openai/gpt-5-nano",
     "openai/gpt-5.2",
+    "zephel/zephel",
+    "zephel/zephel-pro",
+    "zephel/zephel-fast",
   ];
   return ALLOWED_MODELS.includes(model) ? model : "google/gemini-3-flash-preview";
 }
