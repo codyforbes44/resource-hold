@@ -17,21 +17,21 @@ const Footer = () => {
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-            {FOOTER_LINKS.map((link) =>
-            <a
-              key={link.label}
-              href={link.href}
-              className="hover:text-foreground transition-colors"
-              onClick={(e) => {
-                if (link.href.startsWith("#")) {
-                  e.preventDefault();
-                  document.getElementById(link.href.slice(1))?.scrollIntoView({ behavior: "smooth" });
-                }
-              }}>
-              
+            {FOOTER_LINKS.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  if (link.href.startsWith("#")) {
+                    e.preventDefault();
+                    document.getElementById(link.href.slice(1))?.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+              >
                 {link.label}
               </a>
-            )}
+            ))}
             <Link to="/auth" className="hover:text-foreground transition-colors">
               Sign In
             </Link>
@@ -39,12 +39,11 @@ const Footer = () => {
         </div>
 
         <div className="mt-8 border-t border-border/30 pt-6 text-center text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} &gt; gClaw. Open-source AI agent platform. Built on NVIDIA NeMo & OpenClaw.</p>
-          
+          <p>© {new Date().getFullYear()} &gt; gClaw. Open-source AI agent platform.</p>
         </div>
       </div>
-    </footer>);
-
+    </footer>
+  );
 };
 
 export default Footer;
