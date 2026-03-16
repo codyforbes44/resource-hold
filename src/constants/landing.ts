@@ -66,8 +66,8 @@ export const CAPABILITIES: Capability[] = [
   },
   {
     icon: Globe,
-    title: "Web Search",
-    desc: "Firecrawl-powered real-time web search skill. Get cited, up-to-date answers grounded in live web content.",
+    title: "Web Search & Browser",
+    desc: "Firecrawl-powered real-time web search and full-page browsing. Get cited answers from live content or scrape any URL directly.",
     badge: "Live",
   },
   {
@@ -80,6 +80,18 @@ export const CAPABILITIES: Capability[] = [
     icon: Shield,
     title: "RBAC & Governance",
     desc: "Role-based access control with server-side enforcement, audit logging, admin dashboard, and protected routes.",
+    badge: "Live",
+  },
+  {
+    icon: Brain,
+    title: "Persistent Memory",
+    desc: "gClaw remembers your preferences, context, and important details across sessions. It becomes uniquely yours over time.",
+    badge: "Live",
+  },
+  {
+    icon: Cpu,
+    title: "Browser Control",
+    desc: "Browse, scrape, and extract content from any web page. Read documentation, extract data, and analyze page content inline.",
     badge: "Live",
   },
 ];
