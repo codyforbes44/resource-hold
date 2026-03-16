@@ -10,6 +10,9 @@ import ArchitectureSection from "@/components/landing/ArchitectureSection";
 import EcosystemSection from "@/components/landing/EcosystemSection";
 import FAQSection from "@/components/landing/FAQSection";
 import Footer from "@/components/landing/Footer";
+import PressSection from "@/components/landing/PressSection";
+import NewsletterSection from "@/components/landing/NewsletterSection";
+import CommunityLinks from "@/components/landing/CommunityLinks";
 
 const Index = () => {
   return (
@@ -30,7 +33,10 @@ const Index = () => {
         <WhyItMatters />
         <RoadmapTimeline />
         <EcosystemSection />
+        <PressSection />
+        <CommunityLinks />
         <FAQSection />
+        <NewsletterSection />
       </main>
       <Footer />
 

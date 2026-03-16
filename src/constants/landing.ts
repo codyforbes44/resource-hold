@@ -339,7 +339,7 @@ export interface FAQ {
 export const FAQS: FAQ[] = [
   {
     q: "What can I do with gClaw today?",
-    a: "gClaw is a live platform with multi-model chat (Gemini, GPT-5), conversational voice agents, RAG knowledge base with document upload and vector search, web search, image generation, an admin dashboard with RBAC and audit logging, and a PWA for mobile install. Everything listed as 'Live' on this page is shipped and working.",
+    a: "gClaw is a live platform with multi-model chat (Gemini, GPT-5), conversational voice agents, RAG knowledge base with document upload and vector search, web search, browser control, image generation, persistent memory, an admin dashboard with RBAC and audit logging, and a PWA for mobile install. Everything listed as 'Live' on this page is shipped and working.",
   },
   {
     q: "Which AI models does gClaw support?",
@@ -348,6 +348,14 @@ export const FAQS: FAQ[] = [
   {
     q: "How does the Knowledge Base / RAG work?",
     a: "Upload text, markdown, CSV, or JSON files. gClaw automatically chunks the content, generates vector embeddings, and stores them with pgvector. When you chat, the AI retrieves relevant chunks via cosine similarity search and uses them as context for grounded, cited responses.",
+  },
+  {
+    q: "How does Persistent Memory work?",
+    a: "When the Memory skill is enabled, gClaw proactively stores your preferences, context, and important details across sessions. It remembers your name, projects, coding preferences, and more — becoming uniquely personalized to you over time.",
+  },
+  {
+    q: "What is Browser Control?",
+    a: "The Browser Control skill lets gClaw browse any web page, extract its full content as markdown, and use it as context in your conversation. Powered by Firecrawl, it can read documentation, articles, product pages, and more — directly within chat.",
   },
   {
     q: "Is gClaw truly open source?",
