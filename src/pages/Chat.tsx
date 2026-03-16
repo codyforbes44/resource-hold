@@ -527,6 +527,8 @@ const Chat = () => {
     }))
     .filter((group) => group.models.length > 0);
 
+  const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
+
   return (
     <div className="flex h-[100dvh] bg-background">
       {/* Mobile overlay */}
