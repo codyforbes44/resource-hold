@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -8,15 +9,26 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ThemeProvider from "@/components/ThemeProvider";
 import AuthGuard from "@/components/AuthGuard";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
-import Index from "./pages/Index.tsx";
-import Auth from "./pages/Auth.tsx";
-import ResetPassword from "./pages/ResetPassword.tsx";
-import Chat from "./pages/Chat.tsx";
-import Settings from "./pages/Settings.tsx";
-import Admin from "./pages/Admin.tsx";
-import NotFound from "./pages/NotFound.tsx";
+
+// Route-level code splitting
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Admin = lazy(() => import("./pages/Admin"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+const PageLoader = () => (
+  <div className="flex h-screen items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-3">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <p className="text-sm text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 const App = () => (
   <ErrorBoundary>
@@ -27,36 +39,38 @@ const App = () => (
           <Sonner />
           <AuthProvider>
             <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route
-                  path="/chat"
-                  element={
-                    <AuthGuard>
-                      <Chat />
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <AuthGuard>
-                      <Settings />
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin"
-                  element={
-                    <AuthGuard>
-                      <Admin />
-                    </AuthGuard>
-                  }
-                />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route
+                    path="/chat"
+                    element={
+                      <AuthGuard>
+                        <Chat />
+                      </AuthGuard>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <AuthGuard>
+                        <Settings />
+                      </AuthGuard>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <AuthGuard>
+                        <Admin />
+                      </AuthGuard>
+                    }
+                  />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
               <PWAInstallPrompt />
             </BrowserRouter>
           </AuthProvider>
