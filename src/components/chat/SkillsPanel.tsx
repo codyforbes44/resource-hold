@@ -62,7 +62,7 @@ interface SkillsPanelProps {
   knowledgeBasePanel?: React.ReactNode;
 }
 
-const SkillsPanel = ({ open, onClose, skills, onToggleSkill }: SkillsPanelProps) => {
+const SkillsPanel = ({ open, onClose, skills, onToggleSkill, knowledgeBasePanel }: SkillsPanelProps) => {
   if (!open) return null;
 
   return (
