@@ -456,6 +456,10 @@ serve(async (req) => {
     for (const skillId of enabledSkills) {
       if (SKILL_TOOLS[skillId]) tools.push(SKILL_TOOLS[skillId]);
     }
+    // Memory skill adds both store and recall tools
+    if (enabledSkills.includes("memory") && SKILL_TOOLS["memory_recall"]) {
+      tools.push(SKILL_TOOLS["memory_recall"]);
+    }
 
     // Build memory context
     let memoryContext = "";
