@@ -198,62 +198,6 @@ export const COMPARISON_DATA: ComparisonRow[] = [
   { feature: "Browser Control", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
 ];
 
-// --- Roadmap ---
-export interface Milestone {
-  phase: string;
-  date: string;
-  title: string;
-  items: string[];
-  active: boolean;
-  completed?: boolean;
-}
-
-export const MILESTONES: Milestone[] = [
-  {
-    phase: "Phase 1",
-    date: "Q1 2026",
-    title: "Foundation",
-    items: [
-      "Landing page & brand identity",
-      "Auth system with email/Google SSO",
-      "Dark/light theme design system",
-      "PWA with offline support",
-    ],
-    active: false,
-    completed: true,
-  },
-  {
-    phase: "Phase 2",
-    date: "Q2 2026",
-    title: "AI Agent Core",
-    items: [
-      "Multi-provider streaming chat",
-      "Voice agent (ElevenLabs)",
-      "RAG knowledge base with pgvector",
-      "Skill marketplace (Web, Image, KB)",
-    ],
-    active: true,
-  },
-  {
-    phase: "Phase 3",
-    date: "Q3 2026",
-    title: "Enterprise Features",
-    items: [
-      "Admin dashboard with analytics",
-      "Role-based access control",
-      "Audit logging & compliance",
-      "Server-side pagination & filtering",
-    ],
-    active: false,
-  },
-  {
-    phase: "Phase 4",
-    date: "Q4 2026",
-    title: "Ecosystem Launch",
-    items: ["Plugin marketplace", "Community agent templates", "Self-hosted deployment guide", "noclaw edge runtime"],
-    active: false,
-  },
-];
 
 // --- Why It Matters ---
 export interface Layer {
