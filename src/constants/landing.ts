@@ -117,6 +117,7 @@ export interface EcosystemVariant {
 export const ECOSYSTEM_VARIANTS: EcosystemVariant[] = [
   { icon: Bot, name: "gClaw Core", desc: "The foundational agent platform — open-source, self-hostable, community-driven.", badge: "Free" },
   { icon: Shield, name: "gClaw Enterprise", desc: "SOC 2 compliant, SSO, audit logging, priority support, and SLA guarantees.", badge: "Coming Soon" },
+  { icon: Cpu, name: "noclaw", desc: "Minimal autonomous agent runtime in pure C (~88KB). Built for edge devices, IoT gateways, and resource-constrained environments where every byte counts.", badge: "Edge" },
   { icon: Wrench, name: "gClaw Builder", desc: "No-code agent builder with visual workflow editor and pre-built templates.", badge: "Coming Soon" },
   { icon: Users, name: "gClaw Community", desc: "Shared agent templates, plugins, and integrations contributed by the community.", badge: "Open" },
 ];
