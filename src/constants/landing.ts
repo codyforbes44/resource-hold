@@ -195,6 +195,8 @@ export const COMPARISON_DATA: ComparisonRow[] = [
   { feature: "Enterprise RBAC", gclaw: "yes", openclaw: "partial", nemoclaw: "yes" },
   { feature: "Skill Marketplace", gclaw: "yes", openclaw: "partial", nemoclaw: "no" },
   { feature: "Self-Hosted Option", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Persistent Memory", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Browser Control", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
 ];
 
 // --- Roadmap ---
