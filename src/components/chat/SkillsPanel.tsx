@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Code, ImageIcon, BookOpen, FlaskConical, X, Sparkles } from "lucide-react";
+import { Search, Code, ImageIcon, BookOpen, FlaskConical, X, Sparkles, Brain, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +60,24 @@ const DEFAULT_SKILLS: Skill[] = [
     enabled: false,
     badge: "Multi-Source",
     color: "hsl(270 70% 60%)",
+  },
+  {
+    id: "memory",
+    name: "Memory",
+    description: "Remembers your preferences, context, and important details across sessions. Becomes uniquely yours over time.",
+    icon: Brain,
+    enabled: false,
+    badge: "Persistent",
+    color: "hsl(310 70% 55%)",
+  },
+  {
+    id: "browser",
+    name: "Browser Control",
+    description: "Browse, scrape, and extract content from any web page. Read documentation, articles, and data directly.",
+    icon: Globe,
+    enabled: false,
+    badge: "Firecrawl",
+    color: "hsl(190 80% 45%)",
   },
 ];
 

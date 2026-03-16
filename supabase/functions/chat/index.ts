@@ -84,6 +84,49 @@ const SKILL_TOOLS: Record<string, any> = {
       },
     },
   },
+  memory: {
+    type: "function",
+    function: {
+      name: "store_memory",
+      description: "Save a user preference, fact, or context to remember across sessions. Use proactively when users share personal details, preferences, or important context.",
+      parameters: {
+        type: "object",
+        properties: {
+          key: { type: "string", description: "Short identifier for this memory (e.g. 'preferred_language', 'name', 'project_stack')" },
+          value: { type: "string", description: "The value to remember" },
+          category: { type: "string", description: "Category: 'preference', 'fact', 'context', or 'general'" },
+        },
+        required: ["key", "value"],
+      },
+    },
+  },
+  memory_recall: {
+    type: "function",
+    function: {
+      name: "recall_memory",
+      description: "Retrieve stored memories about the user to personalize responses. Use at the start of conversations or when context would help.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Optional category filter: 'preference', 'fact', 'context', or 'general'. Omit to retrieve all." },
+        },
+      },
+    },
+  },
+  browser: {
+    type: "function",
+    function: {
+      name: "browse_page",
+      description: "Browse and extract the full content of a specific web page URL. Returns the page content as markdown.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The full URL of the page to browse" },
+        },
+        required: ["url"],
+      },
+    },
+  },
 };
 
 // ── Tool executors ──
@@ -234,12 +277,69 @@ async function executeDeepResearch(query: string, userId: string): Promise<strin
   return `## Web Results\n\n${webResults}\n\n---\n\n## Knowledge Base Results\n\n${kbResults}`;
 }
 
+async function executeStoreMemory(key: string, value: string, category: string, userId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { error } = await adminClient
+      .from("user_memory")
+      .upsert({ user_id: userId, key, value, category: category || "general" }, { onConflict: "user_id,key" });
+    if (error) return `Failed to store memory: ${error.message}`;
+    return `Memory stored: "${key}" = "${value}" (${category || "general"})`;
+  } catch (e) {
+    return `Memory store error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeRecallMemory(category: string | undefined, userId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    let query = adminClient.from("user_memory").select("key, value, category, updated_at").eq("user_id", userId);
+    if (category) query = query.eq("category", category);
+    const { data, error } = await query.order("updated_at", { ascending: false }).limit(50);
+    if (error) return `Failed to recall memories: ${error.message}`;
+    if (!data || data.length === 0) return "No memories stored yet for this user.";
+    return data.map((m: any) => `[${m.category}] ${m.key}: ${m.value}`).join("\n");
+  } catch (e) {
+    return `Memory recall error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeBrowsePage(url: string): Promise<string> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) return "Browser control is not configured. FIRECRAWL_API_KEY is missing.";
+  try {
+    let formattedUrl = url.trim();
+    if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
+      formattedUrl = `https://${formattedUrl}`;
+    }
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: formattedUrl, formats: ["markdown"], onlyMainContent: true }),
+    });
+    const data = await response.json();
+    if (!response.ok) return `Browse failed: ${data.error || response.status}`;
+    const markdown = data.data?.markdown || data.markdown || "";
+    if (!markdown) return "Page returned no content.";
+    return markdown.slice(0, 5000);
+  } catch (e) {
+    return `Browse error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
 async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
     case "generate_image": return await executeImageGeneration(args.prompt);
     case "search_knowledge": return await executeKnowledgeSearch(args.query, userId);
     case "deep_research": return await executeDeepResearch(args.query, userId);
+    case "store_memory": return await executeStoreMemory(args.key, args.value, args.category, userId);
+    case "recall_memory": return await executeRecallMemory(args.category, userId);
+    case "browse_page": return await executeBrowsePage(args.url);
     default: return `Unknown tool: ${name}`;
   }
 }
@@ -356,12 +456,27 @@ serve(async (req) => {
     for (const skillId of enabledSkills) {
       if (SKILL_TOOLS[skillId]) tools.push(SKILL_TOOLS[skillId]);
     }
+    // Memory skill adds both store and recall tools
+    if (enabledSkills.includes("memory") && SKILL_TOOLS["memory_recall"]) {
+      tools.push(SKILL_TOOLS["memory_recall"]);
+    }
+
+    // Build memory context
+    let memoryContext = "";
+    if (enabledSkills.includes("memory") && userId) {
+      const memories = await executeRecallMemory(undefined, userId);
+      if (memories && !memories.startsWith("No memories")) {
+        memoryContext = `\n\nUser memories (use these to personalize responses):\n${memories}`;
+      }
+    }
 
     const systemPrompt = `You are gClaw, an enterprise AI assistant built on the OpenClaw agent orchestration protocol. You are helpful, knowledgeable, and concise. Format responses with markdown when appropriate. Use fenced code blocks with language identifiers for code.
 
 ${tools.length > 0 ? "You have access to tools/skills. Use them when they would help answer the user's question." : ""}
+${enabledSkills.includes("memory") ? "\nYou can remember user preferences across sessions. Proactively store important user context (name, preferences, projects, etc.) using store_memory. Use recall_memory at the start to personalize." : ""}
+${enabledSkills.includes("browser") ? "\nYou can browse specific web pages to extract their full content. Use browse_page when the user asks about a specific URL or when you need detailed content from a page." : ""}
 
-When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.`;
+When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.${memoryContext}`;
 
     const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
@@ -431,6 +546,9 @@ When you use a tool and get results, synthesize the information into a helpful r
         : fnName === "generate_image" ? "🎨 Generating image..."
         : fnName === "search_knowledge" ? "📚 Searching knowledge base..."
         : fnName === "deep_research" ? "🔬 Researching across web & knowledge base..."
+        : fnName === "store_memory" ? "🧠 Saving to memory..."
+        : fnName === "recall_memory" ? "🧠 Recalling memories..."
+        : fnName === "browse_page" ? "🌐 Browsing page..."
         : `⚡ Running ${fnName}...`;
       toolStatusChunks.push(
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`

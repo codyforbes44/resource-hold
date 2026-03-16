@@ -33,7 +33,7 @@ export const NAV_LINKS = [
 // --- Hero Stats ---
 export const HERO_STATS = [
   { value: "5+", label: "AI Models" },
-  { value: "4", label: "Skill Modules" },
+  { value: "7", label: "Skill Modules" },
   { value: "100%", label: "Open Source" },
 ] as const;
 
@@ -66,8 +66,8 @@ export const CAPABILITIES: Capability[] = [
   },
   {
     icon: Globe,
-    title: "Web Search",
-    desc: "Firecrawl-powered real-time web search skill. Get cited, up-to-date answers grounded in live web content.",
+    title: "Web Search & Browser",
+    desc: "Firecrawl-powered real-time web search and full-page browsing. Get cited answers from live content or scrape any URL directly.",
     badge: "Live",
   },
   {
@@ -80,6 +80,18 @@ export const CAPABILITIES: Capability[] = [
     icon: Shield,
     title: "RBAC & Governance",
     desc: "Role-based access control with server-side enforcement, audit logging, admin dashboard, and protected routes.",
+    badge: "Live",
+  },
+  {
+    icon: Brain,
+    title: "Persistent Memory",
+    desc: "gClaw remembers your preferences, context, and important details across sessions. It becomes uniquely yours over time.",
+    badge: "Live",
+  },
+  {
+    icon: Cpu,
+    title: "Browser Control",
+    desc: "Browse, scrape, and extract content from any web page. Read documentation, extract data, and analyze page content inline.",
     badge: "Live",
   },
 ];
@@ -150,7 +162,17 @@ export const FEATURES: Feature[] = [
   {
     icon: Workflow,
     title: "gClaw Skills",
-    desc: "Modular skill system: Web Search, Image Generation, Knowledge Base, and Code Interpreter — each toggleable per session.",
+    desc: "Modular skill system: Web Search, Image Gen, Knowledge Base, Code Interpreter, Memory, Browser Control, and Deep Research — each toggleable per session.",
+  },
+  {
+    icon: Brain,
+    title: "Persistent Memory",
+    desc: "Remembers you across sessions. Preferences, context, and important details are stored and recalled automatically.",
+  },
+  {
+    icon: Globe,
+    title: "Browser Control",
+    desc: "Browse any URL, extract content as markdown, and use it as context. Powered by Firecrawl scraping.",
   },
 ];
 
@@ -173,6 +195,8 @@ export const COMPARISON_DATA: ComparisonRow[] = [
   { feature: "Enterprise RBAC", gclaw: "yes", openclaw: "partial", nemoclaw: "yes" },
   { feature: "Skill Marketplace", gclaw: "yes", openclaw: "partial", nemoclaw: "no" },
   { feature: "Self-Hosted Option", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Persistent Memory", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
+  { feature: "Browser Control", gclaw: "yes", openclaw: "yes", nemoclaw: "no" },
 ];
 
 // --- Roadmap ---
@@ -315,7 +339,7 @@ export interface FAQ {
 export const FAQS: FAQ[] = [
   {
     q: "What can I do with gClaw today?",
-    a: "gClaw is a live platform with multi-model chat (Gemini, GPT-5), conversational voice agents, RAG knowledge base with document upload and vector search, web search, image generation, an admin dashboard with RBAC and audit logging, and a PWA for mobile install. Everything listed as 'Live' on this page is shipped and working.",
+    a: "gClaw is a live platform with multi-model chat (Gemini, GPT-5), conversational voice agents, RAG knowledge base with document upload and vector search, web search, browser control, image generation, persistent memory, an admin dashboard with RBAC and audit logging, and a PWA for mobile install. Everything listed as 'Live' on this page is shipped and working.",
   },
   {
     q: "Which AI models does gClaw support?",
@@ -324,6 +348,14 @@ export const FAQS: FAQ[] = [
   {
     q: "How does the Knowledge Base / RAG work?",
     a: "Upload text, markdown, CSV, or JSON files. gClaw automatically chunks the content, generates vector embeddings, and stores them with pgvector. When you chat, the AI retrieves relevant chunks via cosine similarity search and uses them as context for grounded, cited responses.",
+  },
+  {
+    q: "How does Persistent Memory work?",
+    a: "When the Memory skill is enabled, gClaw proactively stores your preferences, context, and important details across sessions. It remembers your name, projects, coding preferences, and more — becoming uniquely personalized to you over time.",
+  },
+  {
+    q: "What is Browser Control?",
+    a: "The Browser Control skill lets gClaw browse any web page, extract its full content as markdown, and use it as context in your conversation. Powered by Firecrawl, it can read documentation, articles, product pages, and more — directly within chat.",
   },
   {
     q: "Is gClaw truly open source?",
