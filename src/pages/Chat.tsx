@@ -839,6 +839,7 @@ const Chat = () => {
                 ))}
               </div>
             </div>
+            <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
           </DrawerContent>
         </Drawer>
       ) : (
