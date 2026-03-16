@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+const ZEPHEL_ENDPOINT = "https://nvfszndwhgtjlxtclowb.supabase.co/functions/v1/external-chat";
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
 
