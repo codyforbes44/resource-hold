@@ -38,11 +38,12 @@ import {
   Check,
   Pencil,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
 import VoiceAgent from "@/components/chat/VoiceAgent";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
+import MarkdownRenderer from "@/components/chat/MarkdownRenderer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
+import { messageSchema } from "@/lib/validations";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -64,6 +65,7 @@ const SUGGESTED_PROMPTS = [
   "Summarize the key points of machine learning",
 ];
 
+const MAX_MESSAGE_LENGTH = 10000;
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const Chat = () => {
@@ -101,7 +103,6 @@ const Chat = () => {
     if (!authLoading && !user) navigate("/auth");
   }, [user, authLoading, navigate]);
 
-  // Load user's default model from settings
   useEffect(() => {
     if (!user) return;
     supabase
@@ -114,12 +115,10 @@ const Chat = () => {
       });
   }, [user]);
 
-  // Auto-close sidebar on mobile
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  // Load conversations
   useEffect(() => {
     if (!user) return;
     supabase
@@ -130,7 +129,6 @@ const Chat = () => {
         if (data) setConversations(data as Conversation[]);
       });
 
-    // Realtime subscription for conversation updates
     const channel = supabase
       .channel("conversations-realtime")
       .on(
@@ -153,7 +151,6 @@ const Chat = () => {
     };
   }, [user]);
 
-  // Load messages when conversation changes
   useEffect(() => {
     if (!activeConv) {
       setMessages([]);
@@ -223,7 +220,6 @@ const Chat = () => {
 
   const deleteMessage = async (idx: number) => {
     if (!activeConv) return;
-    // Delete from DB by finding the message
     const { data } = await supabase
       .from("messages")
       .select("id")
@@ -235,17 +231,53 @@ const Chat = () => {
     setMessages((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const processStream = async (
+    resp: Response,
+    convId: string,
+    onContent: (content: string) => void
+  ): Promise<string> => {
+    const reader = resp.body!.getReader();
+    const decoder = new TextDecoder();
+    let textBuffer = "";
+    let assistantSoFar = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      textBuffer += decoder.decode(value, { stream: true });
+      let newlineIndex: number;
+      while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+        let line = textBuffer.slice(0, newlineIndex);
+        textBuffer = textBuffer.slice(newlineIndex + 1);
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (line.startsWith(":") || line.trim() === "") continue;
+        if (!line.startsWith("data: ")) continue;
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === "[DONE]") break;
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+          if (content) {
+            assistantSoFar += content;
+            onContent(assistantSoFar);
+          }
+        } catch {
+          textBuffer = line + "\n" + textBuffer;
+          break;
+        }
+      }
+    }
+    return assistantSoFar;
+  };
+
   const regenerateMessage = async (idx: number) => {
     if (isStreaming || !activeConv) return;
-    // Find the last user message before this assistant message
     const userMessages = messages.slice(0, idx).filter((m) => m.role === "user");
     if (userMessages.length === 0) return;
 
-    // Remove from this index onwards
     const trimmedMessages = messages.slice(0, idx);
     setMessages(trimmedMessages);
 
-    // Delete the assistant message from DB
     const { data } = await supabase
       .from("messages")
       .select("id")
@@ -258,9 +290,7 @@ const Chat = () => {
       }
     }
 
-    // Re-send
     setIsStreaming(true);
-    let assistantSoFar = "";
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -277,42 +307,15 @@ const Chat = () => {
 
       if (!resp.ok || !resp.body) throw new Error("Failed to regenerate");
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantSoFar += content;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) =>
-                    i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
-                  );
-                }
-                return [...prev, { role: "assistant", content: assistantSoFar }];
-              });
-            }
-          } catch {
-            break;
+      const assistantSoFar = await processStream(resp, activeConv, (content) => {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m);
           }
-        }
-      }
+          return [...prev, { role: "assistant", content }];
+        });
+      });
 
       if (assistantSoFar) {
         await supabase.from("messages").insert({
@@ -334,6 +337,14 @@ const Chat = () => {
     async (overrideInput?: string) => {
       const text = (overrideInput || input).trim();
       if (!text || isStreaming) return;
+
+      // Validate message
+      const validation = messageSchema.safeParse(text);
+      if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
+        return;
+      }
+
       const userMsg: Msg = { role: "user", content: text };
       if (!overrideInput) setInput("");
 
@@ -353,7 +364,6 @@ const Chat = () => {
       setMessages(allMessages);
       setIsStreaming(true);
 
-      let assistantSoFar = "";
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -384,45 +394,15 @@ const Chat = () => {
         }
         if (!resp.ok || !resp.body) throw new Error("Failed to start stream");
 
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let textBuffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          textBuffer += decoder.decode(value, { stream: true });
-
-          let newlineIndex: number;
-          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-            let line = textBuffer.slice(0, newlineIndex);
-            textBuffer = textBuffer.slice(newlineIndex + 1);
-            if (line.endsWith("\r")) line = line.slice(0, -1);
-            if (line.startsWith(":") || line.trim() === "") continue;
-            if (!line.startsWith("data: ")) continue;
-            const jsonStr = line.slice(6).trim();
-            if (jsonStr === "[DONE]") break;
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-              if (content) {
-                assistantSoFar += content;
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === "assistant") {
-                    return prev.map((m, i) =>
-                      i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
-                    );
-                  }
-                  return [...prev, { role: "assistant", content: assistantSoFar }];
-                });
-              }
-            } catch {
-              textBuffer = line + "\n" + textBuffer;
-              break;
+        const assistantSoFar = await processStream(resp, convId, (content) => {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              return prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m);
             }
-          }
-        }
+            return [...prev, { role: "assistant", content }];
+          });
+        });
 
         if (assistantSoFar) {
           await supabase.from("messages").insert({
@@ -431,7 +411,6 @@ const Chat = () => {
             content: assistantSoFar,
             model,
           });
-          // Auto-title with AI after first exchange
           if (allMessages.length === 1) {
             const title = userMsg.content.slice(0, 60);
             await supabase.from("conversations").update({ title }).eq("id", convId);
@@ -469,15 +448,8 @@ const Chat = () => {
     (c) => !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Skills panel content (shared between desktop panel and mobile drawer)
-  const skillsPanelContent = (
-    <SkillsPanel
-      open={true}
-      onClose={() => setSkillsPanelOpen(false)}
-      skills={skills}
-      onToggleSkill={toggleSkill}
-    />
-  );
+  const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
+  const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
   return (
     <div className="flex h-[100dvh] bg-background">
@@ -504,7 +476,7 @@ const Chat = () => {
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Close sidebar"
           >
             <PanelLeftClose className="h-4 w-4" />
@@ -512,10 +484,9 @@ const Chat = () => {
         </div>
 
         <div className="p-2 space-y-2">
-          <Button variant="outline" className="w-full justify-start gap-2" onClick={createConversation}>
+          <Button variant="outline" className="w-full justify-start gap-2 min-h-[44px]" onClick={createConversation}>
             <Plus className="h-4 w-4" /> New Chat
           </Button>
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -531,7 +502,7 @@ const Chat = () => {
           {filteredConversations.map((c) => (
             <div
               key={c.id}
-              className={`group mb-1 flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
+              className={`group mb-1 flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors min-h-[44px] ${
                 activeConv === c.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
               }`}
               onClick={() => selectConversation(c.id)}
@@ -558,7 +529,7 @@ const Chat = () => {
               )}
               <div className="hidden items-center gap-1 group-hover:flex">
                 <button
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground min-h-[32px] min-w-[32px] flex items-center justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingConvId(c.id);
@@ -568,7 +539,7 @@ const Chat = () => {
                   <Pencil className="h-3 w-3" />
                 </button>
                 <button
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive min-h-[32px] min-w-[32px] flex items-center justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteConversation(c.id);
@@ -582,21 +553,21 @@ const Chat = () => {
         </ScrollArea>
 
         <div className="border-t border-border p-2 space-y-1">
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/")}>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/")}>
             <Home className="h-4 w-4" /> Home
           </Button>
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/settings")}>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/settings")}>
             <Settings className="h-4 w-4" /> Settings
           </Button>
           {isAdmin && (
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/admin")}>
+            <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/admin")}>
               <ShieldCheck className="h-4 w-4" /> Admin
             </Button>
           )}
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start gap-2 text-destructive"
+            className="w-full justify-start gap-2 text-destructive min-h-[44px]"
             onClick={signOut}
           >
             <LogOut className="h-4 w-4" /> Sign Out
@@ -611,14 +582,14 @@ const Chat = () => {
           {!sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Open sidebar"
             >
               <PanelLeft className="h-5 w-5" />
             </button>
           )}
           <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="w-[140px] md:w-[200px]">
+            <SelectTrigger className="w-[140px] md:w-[200px] min-h-[44px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -634,7 +605,7 @@ const Chat = () => {
           <Button
             variant={skillsPanelOpen ? "default" : "outline"}
             size="sm"
-            className="gap-1.5"
+            className="gap-1.5 min-h-[44px]"
             onClick={() => setSkillsPanelOpen(!skillsPanelOpen)}
           >
             <Sparkles className="h-4 w-4" />
@@ -645,19 +616,29 @@ const Chat = () => {
               </span>
             )}
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowVoice(!showVoice)}>
+          <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={() => setShowVoice(!showVoice)}>
             <Mic className="h-4 w-4" />
             <span className="hidden sm:inline">{showVoice ? "Hide" : "Voice"}</span>
           </Button>
         </div>
 
         {showVoice ? (
-          <VoiceAgent
-            userId={user!.id}
-            onConversationSaved={(conv) => {
-              setConversations((prev) => [conv, ...prev]);
-            }}
-          />
+          <div className={isMobile ? "fixed inset-0 z-50 bg-background flex flex-col" : "flex flex-1 flex-col"}>
+            {isMobile && (
+              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                <Button variant="ghost" size="sm" onClick={() => setShowVoice(false)} className="min-h-[44px]">
+                  <PanelLeft className="h-4 w-4 mr-2" /> Back
+                </Button>
+                <span className="font-mono font-semibold text-sm">Voice Agent</span>
+              </div>
+            )}
+            <VoiceAgent
+              userId={user!.id}
+              onConversationSaved={(conv) => {
+                setConversations((prev) => [conv, ...prev]);
+              }}
+            />
+          </div>
         ) : (
           <>
             {/* Messages */}
@@ -670,7 +651,6 @@ const Chat = () => {
                     Choose a model above and type a message below. Enable skills via the{" "}
                     <Sparkles className="inline h-3.5 w-3.5" /> button.
                   </p>
-                  {/* Suggested prompts */}
                   <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-lg">
                     {SUGGESTED_PROMPTS.map((prompt) => (
                       <button
@@ -679,19 +659,18 @@ const Chat = () => {
                           setInput(prompt);
                           setTimeout(() => send(prompt), 0);
                         }}
-                        className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all"
+                        className="rounded-full border border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all min-h-[44px]"
                       >
                         {prompt}
                       </button>
                     ))}
                   </div>
-                  {/* Skill chips */}
                   <div className="flex flex-wrap justify-center gap-2 mt-2">
                     {skills.map((s) => (
                       <button
                         key={s.id}
                         onClick={() => toggleSkill(s.id)}
-                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                        className={`flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-all min-h-[44px] ${
                           s.enabled
                             ? "border-primary/30 bg-primary/10 text-primary"
                             : "border-border text-muted-foreground hover:border-primary/20"
@@ -706,18 +685,16 @@ const Chat = () => {
               )}
               {messages.map((msg, i) => (
                 <div key={i} className={`group mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className="relative">
+                  <div className="relative max-w-[90%] md:max-w-[80%]">
                     <div
-                      className={`max-w-[90%] md:max-w-[80%] rounded-xl px-4 py-3 text-sm ${
+                      className={`rounded-xl px-4 py-3 text-sm ${
                         msg.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-foreground"
                       }`}
                     >
                       {msg.role === "assistant" ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none [&_img]:rounded-lg [&_img]:max-h-96 [&_img]:w-auto [&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-lg [&_code]:text-xs">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
-                        </div>
+                        <MarkdownRenderer content={msg.content} />
                       ) : (
                         msg.content
                       )}
@@ -726,7 +703,7 @@ const Chat = () => {
                     <div className="absolute -bottom-6 right-0 hidden items-center gap-1 group-hover:flex">
                       <button
                         onClick={() => copyMessage(msg.content, i)}
-                        className="flex h-6 w-6 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
                         title="Copy"
                       >
                         {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -734,7 +711,7 @@ const Chat = () => {
                       {msg.role === "assistant" && (
                         <button
                           onClick={() => regenerateMessage(i)}
-                          className="flex h-6 w-6 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
                           title="Regenerate"
                         >
                           <RotateCcw className="h-3 w-3" />
@@ -742,7 +719,7 @@ const Chat = () => {
                       )}
                       <button
                         onClick={() => deleteMessage(i)}
-                        className="flex h-6 w-6 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-destructive"
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-destructive"
                         title="Delete"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -779,7 +756,7 @@ const Chat = () => {
             )}
 
             {/* Input */}
-            <div className="border-t border-border p-3 md:p-4 pb-[env(safe-area-inset-bottom,12px)]">
+            <div className="border-t border-border p-3 md:p-4 pb-[max(env(safe-area-inset-bottom,0px),12px)]">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -787,18 +764,30 @@ const Chat = () => {
                 }}
                 className="flex gap-2"
               >
-                <Input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={
-                    enabledSkillIds.length > 0
-                      ? "Ask anything — skills active..."
-                      : "Type a message..."
-                  }
-                  disabled={isStreaming}
-                  className="flex-1 min-h-[44px]"
-                />
+                <div className="relative flex-1">
+                  <Input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+                    placeholder={
+                      enabledSkillIds.length > 0
+                        ? "Ask anything — skills active..."
+                        : "Type a message..."
+                    }
+                    disabled={isStreaming}
+                    className="flex-1 min-h-[44px] pr-14"
+                    maxLength={MAX_MESSAGE_LENGTH}
+                  />
+                  {showCharCount && (
+                    <span
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] ${
+                        charsRemaining < 500 ? "text-destructive" : "text-muted-foreground"
+                      }`}
+                    >
+                      {charsRemaining.toLocaleString()}
+                    </span>
+                  )}
+                </div>
                 <Button type="submit" disabled={isStreaming || !input.trim()} className="min-h-[44px] min-w-[44px]">
                   <Send className="h-4 w-4" />
                 </Button>
@@ -823,7 +812,7 @@ const Chat = () => {
                 {skills.map((skill) => (
                   <div
                     key={skill.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-4"
+                    className="flex items-center justify-between rounded-lg border border-border p-4 min-h-[60px]"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
@@ -841,7 +830,7 @@ const Chat = () => {
                       variant={skill.enabled ? "default" : "outline"}
                       size="sm"
                       onClick={() => toggleSkill(skill.id)}
-                      className="shrink-0 ml-2"
+                      className="shrink-0 ml-2 min-h-[44px] min-w-[52px]"
                     >
                       {skill.enabled ? "On" : "Off"}
                     </Button>

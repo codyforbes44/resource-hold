@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { resetPasswordSchema, getPasswordStrength } from "@/lib/validations";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 const ResetPassword = () => {
@@ -12,15 +13,16 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isRecovery, setIsRecovery] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
+  const strength = getPasswordStrength(password);
+
   useEffect(() => {
-    // Check for recovery token in URL hash
     const hash = window.location.hash;
     if (hash.includes("type=recovery")) {
       setIsRecovery(true);
     } else {
-      // Also listen for auth state changes for recovery event
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
         if (event === "PASSWORD_RECOVERY") {
           setIsRecovery(true);
@@ -32,12 +34,16 @@ const ResetPassword = () => {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+    setErrors({});
+
+    const result = resetPasswordSchema.safeParse({ password, confirmPassword });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
       return;
     }
 
@@ -77,9 +83,7 @@ const ResetPassword = () => {
         <div className="flex flex-col items-center gap-3">
           <img src={logoSrc} alt="gClaw" className="h-12 w-12" />
           <h1 className="font-display text-2xl font-bold">Set New Password</h1>
-          <p className="text-sm text-muted-foreground">
-            Enter your new password below.
-          </p>
+          <p className="text-sm text-muted-foreground">Enter your new password below.</p>
         </div>
 
         <form onSubmit={handleReset} className="space-y-4">
@@ -92,8 +96,26 @@ const ResetPassword = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              className={errors.password ? "border-destructive" : ""}
             />
+            {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+            {password.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors ${
+                        i <= strength.score ? strength.color : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Strength: <span className="font-medium">{strength.label}</span>
+                </p>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -104,8 +126,11 @@ const ResetPassword = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              minLength={6}
+              className={errors.confirmPassword ? "border-destructive" : ""}
             />
+            {errors.confirmPassword && (
+              <p className="text-xs text-destructive">{errors.confirmPassword}</p>
+            )}
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Updating..." : "Update Password"}

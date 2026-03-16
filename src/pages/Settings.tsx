@@ -12,6 +12,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, User, Settings2, Shield } from "lucide-react";
+import { changePasswordSchema, displayNameSchema, getPasswordStrength } from "@/lib/validations";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 const MODELS = [
@@ -34,11 +35,12 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
+
+  const strength = getPasswordStrength(newPassword);
 
   useEffect(() => {
     if (!user) return;
-
-    // Load profile
     supabase
       .from("profiles")
       .select("*")
@@ -51,7 +53,6 @@ const Settings = () => {
         }
       });
 
-    // Load settings
     supabase
       .from("user_settings")
       .select("*")
@@ -67,6 +68,11 @@ const Settings = () => {
 
   const handleSaveProfile = async () => {
     if (!user) return;
+    const nameResult = displayNameSchema.safeParse(displayName);
+    if (!nameResult.success) {
+      toast.error(nameResult.error.errors[0].message);
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase
@@ -89,7 +95,6 @@ const Settings = () => {
       toast.error("File must be under 2MB");
       return;
     }
-
     const ext = file.name.split(".").pop();
     const path = `${user.id}/avatar.${ext}`;
 
@@ -139,14 +144,19 @@ const Settings = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    setPasswordErrors({});
+
+    const result = changePasswordSchema.safeParse({ newPassword, confirmNewPassword });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field] = err.message;
+      });
+      setPasswordErrors(fieldErrors);
       return;
     }
-    if (newPassword !== confirmNewPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -172,10 +182,9 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="border-b border-border">
         <div className="container flex h-14 items-center gap-3 px-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/chat")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/chat")} className="min-h-[44px] min-w-[44px]">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <img src={logoSrc} alt="gClaw" className="h-6 w-6" />
@@ -188,21 +197,20 @@ const Settings = () => {
       <div className="container max-w-2xl px-4 py-6">
         <Tabs defaultValue="profile" className="w-full">
           <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="profile" className="gap-2">
+            <TabsTrigger value="profile" className="gap-2 min-h-[44px]">
               <User className="h-4 w-4 hidden sm:block" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="gap-2">
+            <TabsTrigger value="preferences" className="gap-2 min-h-[44px]">
               <Settings2 className="h-4 w-4 hidden sm:block" />
               Preferences
             </TabsTrigger>
-            <TabsTrigger value="account" className="gap-2">
+            <TabsTrigger value="account" className="gap-2 min-h-[44px]">
               <Shield className="h-4 w-4 hidden sm:block" />
               Account
             </TabsTrigger>
           </TabsList>
 
-          {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6 pt-4">
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
@@ -212,7 +220,7 @@ const Settings = () => {
                 </Avatar>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 min-h-[44px] min-w-[44px]"
                 >
                   <Upload className="h-3.5 w-3.5" />
                 </button>
@@ -235,7 +243,11 @@ const Settings = () => {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Your name"
+                  maxLength={100}
                 />
+                <p className="text-[11px] text-muted-foreground text-right">
+                  {displayName.length}/100
+                </p>
               </div>
               <Button onClick={handleSaveProfile} disabled={loading} className="w-full sm:w-auto">
                 Save Profile
@@ -243,13 +255,12 @@ const Settings = () => {
             </div>
           </TabsContent>
 
-          {/* Preferences Tab */}
           <TabsContent value="preferences" className="space-y-6 pt-4">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Default AI Model</Label>
                 <Select value={defaultModel} onValueChange={setDefaultModel}>
-                  <SelectTrigger>
+                  <SelectTrigger className="min-h-[44px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -262,7 +273,7 @@ const Settings = () => {
                 </Select>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-4 min-h-[60px]">
                 <div>
                   <p className="text-sm font-medium">Theme</p>
                   <p className="text-xs text-muted-foreground">Toggle between light and dark mode</p>
@@ -270,7 +281,7 @@ const Settings = () => {
                 <ThemeToggle />
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-4 min-h-[60px]">
                 <div>
                   <p className="text-sm font-medium">Notifications</p>
                   <p className="text-xs text-muted-foreground">Enable desktop notifications</p>
@@ -287,7 +298,6 @@ const Settings = () => {
             </div>
           </TabsContent>
 
-          {/* Account Tab */}
           <TabsContent value="account" className="space-y-6 pt-4">
             <form onSubmit={handleChangePassword} className="space-y-4">
               <h3 className="text-sm font-semibold">Change Password</h3>
@@ -299,8 +309,28 @@ const Settings = () => {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
-                  minLength={6}
+                  className={passwordErrors.newPassword ? "border-destructive" : ""}
                 />
+                {passwordErrors.newPassword && (
+                  <p className="text-xs text-destructive">{passwordErrors.newPassword}</p>
+                )}
+                {newPassword.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <div
+                          key={i}
+                          className={`h-1 flex-1 rounded-full transition-colors ${
+                            i <= strength.score ? strength.color : "bg-muted"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Strength: <span className="font-medium">{strength.label}</span>
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
@@ -310,8 +340,11 @@ const Settings = () => {
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
                   placeholder="••••••••"
-                  minLength={6}
+                  className={passwordErrors.confirmNewPassword ? "border-destructive" : ""}
                 />
+                {passwordErrors.confirmNewPassword && (
+                  <p className="text-xs text-destructive">{passwordErrors.confirmNewPassword}</p>
+                )}
               </div>
               <Button type="submit" disabled={loading || !newPassword}>
                 Update Password
