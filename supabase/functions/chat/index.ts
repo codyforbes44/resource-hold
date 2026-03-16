@@ -542,6 +542,9 @@ When you use a tool and get results, synthesize the information into a helpful r
         : fnName === "generate_image" ? "🎨 Generating image..."
         : fnName === "search_knowledge" ? "📚 Searching knowledge base..."
         : fnName === "deep_research" ? "🔬 Researching across web & knowledge base..."
+        : fnName === "store_memory" ? "🧠 Saving to memory..."
+        : fnName === "recall_memory" ? "🧠 Recalling memories..."
+        : fnName === "browse_page" ? "🌐 Browsing page..."
         : `⚡ Running ${fnName}...`;
       toolStatusChunks.push(
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
