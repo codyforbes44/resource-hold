@@ -91,7 +91,7 @@ const HeroSection = () => {
           className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-cycle-brand bg-primary/10 px-3 py-1 text-xs font-medium text-primary sm:mb-8 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-sm"
         >
           <Zap className="h-3.5 w-3.5" />
-          Multi-Model Chat · Voice Agents · RAG · Enterprise RBAC
+          Multi-Model Chat · Voice Agents · RAG · Zephel.AI
         </motion.div>
 
         <motion.h1
