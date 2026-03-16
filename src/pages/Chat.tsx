@@ -84,6 +84,29 @@ const ALL_MODEL_GROUPS = [
   },
 ];
 
+// Skill-to-model compatibility: which skills each model handles well
+const MODEL_SKILL_COMPAT: Record<string, string[]> = {
+  "google/gemini-3-flash-preview": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "google/gemini-2.5-flash": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "google/gemini-2.5-pro": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "google/gemini-2.5-flash-lite": ["web_search", "code_interpreter"],
+  "google/gemini-3.1-pro-preview": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "openai/gpt-5-mini": ["web_search", "code_interpreter", "knowledge_base"],
+  "openai/gpt-5": ["web_search", "code_interpreter", "knowledge_base"],
+  "openai/gpt-5-nano": ["web_search", "code_interpreter"],
+  "openai/gpt-5.2": ["web_search", "code_interpreter", "knowledge_base"],
+  "zephel/zephel": ["web_search", "code_interpreter", "knowledge_base"],
+  "zephel/zephel-pro": ["web_search", "code_interpreter", "knowledge_base"],
+  "zephel/zephel-fast": ["web_search", "code_interpreter"],
+};
+
+const SKILL_LABELS: Record<string, string> = {
+  web_search: "Web Search",
+  code_interpreter: "Code Interpreter",
+  image_generation: "Image Generation",
+  knowledge_base: "Knowledge Base",
+};
+
 const SUGGESTED_PROMPTS = [
   "Explain quantum computing in simple terms",
   "Write a Python function to sort a list",
