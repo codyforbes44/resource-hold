@@ -847,7 +847,9 @@ const Chat = () => {
                 ))}
               </div>
             </div>
-            <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+            <Suspense fallback={null}>
+              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+            </Suspense>
           </DrawerContent>
         </Drawer>
       ) : (
@@ -858,7 +860,9 @@ const Chat = () => {
             skills={skills}
             onToggleSkill={toggleSkill}
             knowledgeBasePanel={
-              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+              <Suspense fallback={null}>
+                <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+              </Suspense>
             }
           />
         </>
