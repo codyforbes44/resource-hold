@@ -745,7 +745,15 @@ const Chat = () => {
                       className={m.isDisabled ? "opacity-40 cursor-not-allowed" : ""}
                       title={m.isDisabled ? `Not compatible with: ${m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}` : undefined}
                     >
-                      {m.label}
+                      <span className="flex items-center gap-1.5">
+                        {m.label}
+                        {m.isDisabled && (
+                          <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                            <AlertTriangle className="h-3 w-3" />
+                            {m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}
+                          </span>
+                        )}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectGroup>
