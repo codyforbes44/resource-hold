@@ -586,7 +586,7 @@ const Chat = () => {
     }))
     .filter((group) => group.models.length > 0);
 
-  // Auto-switch is handled via a separate effect above the early return
+  
 
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
