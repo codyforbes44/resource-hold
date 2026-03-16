@@ -293,6 +293,39 @@ serve(async (req) => {
 
     const messages = validateAndSanitize(body.messages);
     const selectedModel = validateModel(body.model || "google/gemini-3-flash-preview");
+
+    // ── Model access enforcement ──
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const accessClient = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: modelDefault } = await accessClient
+      .from("model_access_defaults")
+      .select("enabled, visitor_enabled")
+      .eq("model", selectedModel)
+      .single();
+
+    if (modelDefault) {
+      if (userId) {
+        // Check user-specific override first
+        const { data: override } = await accessClient
+          .from("user_model_overrides")
+          .select("enabled")
+          .eq("user_id", userId)
+          .eq("model", selectedModel)
+          .single();
+
+        const allowed = override ? override.enabled : modelDefault.enabled;
+        if (!allowed) {
+          return errorResponse(403, "This model is not available for your account. Contact an administrator.");
+        }
+      } else {
+        // Visitor
+        if (!modelDefault.visitor_enabled) {
+          return errorResponse(403, "This model requires authentication. Please sign in.");
+        }
+      }
+    }
     const enabledSkills: string[] = Array.isArray(body.skills) ? body.skills : [];
     const { url: apiUrl, apiKey, modelName } = getApiConfig(selectedModel);
 
