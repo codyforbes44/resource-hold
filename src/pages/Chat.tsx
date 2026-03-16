@@ -84,6 +84,29 @@ const ALL_MODEL_GROUPS = [
   },
 ];
 
+// Skill-to-model compatibility: which skills each model handles well
+const MODEL_SKILL_COMPAT: Record<string, string[]> = {
+  "google/gemini-3-flash-preview": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "google/gemini-2.5-flash": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "google/gemini-2.5-pro": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "google/gemini-2.5-flash-lite": ["web_search", "code_interpreter"],
+  "google/gemini-3.1-pro-preview": ["web_search", "code_interpreter", "image_generation", "knowledge_base"],
+  "openai/gpt-5-mini": ["web_search", "code_interpreter", "knowledge_base"],
+  "openai/gpt-5": ["web_search", "code_interpreter", "knowledge_base"],
+  "openai/gpt-5-nano": ["web_search", "code_interpreter"],
+  "openai/gpt-5.2": ["web_search", "code_interpreter", "knowledge_base"],
+  "zephel/zephel": ["web_search", "code_interpreter", "knowledge_base"],
+  "zephel/zephel-pro": ["web_search", "code_interpreter", "knowledge_base"],
+  "zephel/zephel-fast": ["web_search", "code_interpreter"],
+};
+
+const SKILL_LABELS: Record<string, string> = {
+  web_search: "Web Search",
+  code_interpreter: "Code Interpreter",
+  image_generation: "Image Generation",
+  knowledge_base: "Knowledge Base",
+};
+
 const SUGGESTED_PROMPTS = [
   "Explain quantum computing in simple terms",
   "Write a Python function to sort a list",
@@ -185,6 +208,27 @@ const Chat = () => {
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
+
+  // Auto-switch model if current selection becomes incompatible with enabled skills
+  useEffect(() => {
+    const activeSkillsForSwitch = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
+    if (activeSkillsForSwitch.length === 0) return;
+    const supported = MODEL_SKILL_COMPAT[model] || [];
+    const incompatible = activeSkillsForSwitch.filter((skillId) => !supported.includes(skillId));
+    if (incompatible.length > 0) {
+      // Find first compatible model from allowed models
+      const allAllowed = ALL_MODEL_GROUPS.flatMap((g) => g.models)
+        .filter((m) => !allowedModels || allowedModels.includes(m.value));
+      const firstCompatible = allAllowed.find((m) => {
+        const mSupported = MODEL_SKILL_COMPAT[m.value] || [];
+        return activeSkillsForSwitch.every((s) => mSupported.includes(s));
+      });
+      if (firstCompatible) {
+        setModel(firstCompatible.value);
+        toast.info(`Switched to ${firstCompatible.label} — ${incompatible.map((s) => SKILL_LABELS[s] || s).join(", ")} not supported by previous model`);
+      }
+    }
+  }, [skills, allowedModels]);
 
   useEffect(() => {
     if (!user) return;
@@ -513,19 +557,36 @@ const Chat = () => {
 
   const activeSkillCount = skills.filter((s) => s.enabled).length;
 
+  // Determine which skills are actively enabled (excluding code_interpreter which all models support)
+  const activeSkillsForCompat = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
+
+  // Check if a model is incompatible with any enabled skill
+  const getIncompatibleSkills = (modelValue: string): string[] => {
+    const supported = MODEL_SKILL_COMPAT[modelValue] || [];
+    return activeSkillsForCompat.filter((skillId) => !supported.includes(skillId));
+  };
+
   const filteredConversations = conversations.filter(
     (c) => !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
 
-  // Filter model groups by allowed models
+  // Filter model groups by allowed models, add incompatibility info
   const MODEL_GROUPS = ALL_MODEL_GROUPS
     .map((group) => ({
       ...group,
-      models: group.models.filter((m) => !allowedModels || allowedModels.includes(m.value)),
+      models: group.models
+        .filter((m) => !allowedModels || allowedModels.includes(m.value))
+        .map((m) => ({
+          ...m,
+          incompatibleSkills: getIncompatibleSkills(m.value),
+          isDisabled: getIncompatibleSkills(m.value).length > 0,
+        })),
     }))
     .filter((group) => group.models.length > 0);
+
+  
 
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
@@ -675,7 +736,13 @@ const Chat = () => {
                 <SelectGroup key={group.label}>
                   <SelectLabel>{group.label}</SelectLabel>
                   {group.models.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
+                    <SelectItem
+                      key={m.value}
+                      value={m.value}
+                      disabled={m.isDisabled}
+                      className={m.isDisabled ? "opacity-40 cursor-not-allowed" : ""}
+                      title={m.isDisabled ? `Not compatible with: ${m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}` : undefined}
+                    >
                       {m.label}
                     </SelectItem>
                   ))}
