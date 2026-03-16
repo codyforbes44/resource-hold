@@ -84,6 +84,49 @@ const SKILL_TOOLS: Record<string, any> = {
       },
     },
   },
+  memory: {
+    type: "function",
+    function: {
+      name: "store_memory",
+      description: "Save a user preference, fact, or context to remember across sessions. Use proactively when users share personal details, preferences, or important context.",
+      parameters: {
+        type: "object",
+        properties: {
+          key: { type: "string", description: "Short identifier for this memory (e.g. 'preferred_language', 'name', 'project_stack')" },
+          value: { type: "string", description: "The value to remember" },
+          category: { type: "string", description: "Category: 'preference', 'fact', 'context', or 'general'" },
+        },
+        required: ["key", "value"],
+      },
+    },
+  },
+  memory_recall: {
+    type: "function",
+    function: {
+      name: "recall_memory",
+      description: "Retrieve stored memories about the user to personalize responses. Use at the start of conversations or when context would help.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Optional category filter: 'preference', 'fact', 'context', or 'general'. Omit to retrieve all." },
+        },
+      },
+    },
+  },
+  browser: {
+    type: "function",
+    function: {
+      name: "browse_page",
+      description: "Browse and extract the full content of a specific web page URL. Returns the page content as markdown.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The full URL of the page to browse" },
+        },
+        required: ["url"],
+      },
+    },
+  },
 };
 
 // ── Tool executors ──
