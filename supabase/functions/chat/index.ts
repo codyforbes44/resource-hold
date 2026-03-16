@@ -252,6 +252,21 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Extract user ID for knowledge base search
+    let userId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await userClient.auth.getUser();
+        userId = user?.id || null;
+      } catch { /* proceed without userId */ }
+    }
+
     const messages = validateAndSanitize(body.messages);
     const selectedModel = validateModel(body.model || "google/gemini-3-flash-preview");
     const enabledSkills: string[] = Array.isArray(body.skills) ? body.skills : [];
