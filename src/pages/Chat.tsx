@@ -54,15 +54,30 @@ const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePan
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
 
-const MODELS = [
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
-  { value: "openai/gpt-5", label: "GPT-5" },
-  { value: "zephel/zephel", label: "Zephel" },
-  { value: "zephel/zephel-pro", label: "Zephel Pro" },
-  { value: "zephel/zephel-fast", label: "Zephel Fast" },
+const MODEL_GROUPS = [
+  {
+    label: "Google",
+    models: [
+      { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
+      { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    ],
+  },
+  {
+    label: "OpenAI",
+    models: [
+      { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
+      { value: "openai/gpt-5", label: "GPT-5" },
+    ],
+  },
+  {
+    label: "Zephel",
+    models: [
+      { value: "zephel/zephel", label: "Zephel" },
+      { value: "zephel/zephel-pro", label: "Zephel Pro" },
+      { value: "zephel/zephel-fast", label: "Zephel Fast" },
+    ],
+  },
 ];
 
 const SUGGESTED_PROMPTS = [
