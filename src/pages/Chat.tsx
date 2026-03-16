@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,14 +38,16 @@ import {
   Check,
   Pencil,
 } from "lucide-react";
-import VoiceAgent from "@/components/chat/VoiceAgent";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
-import MarkdownRenderer from "@/components/chat/MarkdownRenderer";
-import KnowledgeBasePanel from "@/components/chat/KnowledgeBasePanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
+import { getAccessToken } from "@/lib/supabase-helpers";
 import logoSrc from "@/assets/logo-gclaw.png";
+
+const VoiceAgent = lazy(() => import("@/components/chat/VoiceAgent"));
+const MarkdownRenderer = lazy(() => import("@/components/chat/MarkdownRenderer"));
+const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePanel"));
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
@@ -296,11 +298,12 @@ const Chat = () => {
     abortRef.current = controller;
 
     try {
+      const token = await getAccessToken();
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ messages: trimmedMessages, model, skills: enabledSkillIds }),
         signal: controller.signal,
@@ -369,11 +372,12 @@ const Chat = () => {
       abortRef.current = controller;
 
       try {
+        const token = await getAccessToken();
         const resp = await fetch(CHAT_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             messages: allMessages,
@@ -633,12 +637,14 @@ const Chat = () => {
                 <span className="font-mono font-semibold text-sm">Voice Agent</span>
               </div>
             )}
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
             <VoiceAgent
               userId={user!.id}
               onConversationSaved={(conv) => {
                 setConversations((prev) => [conv, ...prev]);
               }}
             />
+            </Suspense>
           </div>
         ) : (
           <>
@@ -695,7 +701,9 @@ const Chat = () => {
                       }`}
                     >
                       {msg.role === "assistant" ? (
-                        <MarkdownRenderer content={msg.content} />
+                        <Suspense fallback={<span>{msg.content}</span>}>
+                          <MarkdownRenderer content={msg.content} />
+                        </Suspense>
                       ) : (
                         msg.content
                       )}
@@ -839,7 +847,9 @@ const Chat = () => {
                 ))}
               </div>
             </div>
-            <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+            <Suspense fallback={null}>
+              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+            </Suspense>
           </DrawerContent>
         </Drawer>
       ) : (
@@ -850,7 +860,9 @@ const Chat = () => {
             skills={skills}
             onToggleSkill={toggleSkill}
             knowledgeBasePanel={
-              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+              <Suspense fallback={null}>
+                <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+              </Suspense>
             }
           />
         </>

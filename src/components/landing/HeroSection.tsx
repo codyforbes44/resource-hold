@@ -2,11 +2,10 @@ import { useRef, useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Github, Zap } from "lucide-react";
-import heroBg from "@/assets/hero-bg.png";
+import { ArrowRight, Zap } from "lucide-react";
 import { HERO_STATS } from "@/constants/landing";
 
-const PARTICLE_COUNT = 40;
+const PARTICLE_COUNT = 30;
 
 const HeroParticles = () => {
   const particles = useMemo(() => {
@@ -27,23 +26,13 @@ const HeroParticles = () => {
         <motion.span
           key={p.id}
           className="absolute rounded-full bg-primary"
-          style={{
-            left: p.left,
-            top: p.top,
-            width: p.size,
-            height: p.size,
-          }}
+          style={{ left: p.left, top: p.top, width: p.size, height: p.size }}
           animate={{
             opacity: [0, p.opacity, 0],
             y: [0, -20 - Math.random() * 30, 0],
             x: [0, (Math.random() - 0.5) * 20, 0],
           }}
-          transition={{
-            duration: p.duration,
-            delay: p.delay,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: "easeInOut" }}
         />
       ))}
     </div>
@@ -59,20 +48,13 @@ const AnimatedCounter = ({ value, label }: { value: string; label: string }) => 
 
   useEffect(() => {
     if (!isInView) return;
-    if (isNaN(numericPart)) {
-      setDisplay(value);
-      return;
-    }
+    if (isNaN(numericPart)) { setDisplay(value); return; }
     let current = 0;
     const step = Math.max(1, Math.floor(numericPart / 20));
     const interval = setInterval(() => {
       current += step;
-      if (current >= numericPart) {
-        setDisplay(value);
-        clearInterval(interval);
-      } else {
-        setDisplay(`${current}${suffix}`);
-      }
+      if (current >= numericPart) { setDisplay(value); clearInterval(interval); }
+      else setDisplay(`${current}${suffix}`);
     }, 40);
     return () => clearInterval(interval);
   }, [isInView, numericPart, suffix, value]);
@@ -87,17 +69,14 @@ const AnimatedCounter = ({ value, label }: { value: string; label: string }) => 
 
 const HeroSection = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start start", "end start"],
-  });
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] });
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
   return (
     <section ref={sectionRef} className="relative overflow-hidden pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
-      {/* Parallax background */}
+      {/* Parallax background — CSS gradient mesh instead of 2.4MB PNG */}
       <motion.div className="absolute inset-0 -z-10" style={{ y: bgY }}>
-        <img src={heroBg} alt="" aria-hidden="true" className="absolute inset-0 h-[130%] w-full object-cover" />
+        <div className="absolute inset-0 hero-mesh" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/5 blur-[120px]" />
         <div className="absolute top-1/3 right-1/4 h-[300px] w-[300px] rounded-full bg-gclaw-red/5 blur-[100px]" />
@@ -105,7 +84,6 @@ const HeroSection = () => {
       </motion.div>
 
       <div className="container text-center">
-        {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -113,10 +91,9 @@ const HeroSection = () => {
           className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-cycle-brand bg-primary/10 px-3 py-1 text-xs font-medium text-primary sm:mb-8 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-sm"
         >
           <Zap className="h-3.5 w-3.5" />
-          Open-Source · Hardware Agnostic · Enterprise Ready
+          Multi-Model Chat · Voice Agents · RAG · Enterprise RBAC
         </motion.div>
 
-        {/* Headline */}
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -124,22 +101,20 @@ const HeroSection = () => {
           className="mx-auto max-w-4xl font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl lg:text-7xl"
         >
           Enterprise AI Agents,{" "}
-          <span className="text-cycle-brand">Redefined</span>
+          <span className="text-cycle-brand">Shipped</span>
         </motion.h1>
 
-        {/* Subheadline */}
         <motion.p
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mx-auto mt-4 max-w-2xl px-2 text-sm leading-relaxed text-muted-foreground sm:mt-6 sm:px-0 sm:text-base md:text-lg lg:text-xl"
         >
-          &gt; gClaw is a multi-provider, hardware-agnostic AI agent platform built on NVIDIA NeMo
-          and the OpenClaw ecosystem. Deploy voice, multimodal, and autonomous agents with
-          enterprise-grade security — on any hardware.
+          &gt; gClaw is a production AI agent platform with multi-model chat, voice agents,
+          RAG knowledge base, web search, image generation, and enterprise governance —
+          all open-source and running today.
         </motion.p>
 
-        {/* CTAs */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -152,13 +127,13 @@ const HeroSection = () => {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="outline" size="lg" className="gap-2 border-border px-6 text-sm sm:px-8 sm:text-base">
-            <Github className="h-4 w-4" />
-            View on GitHub
+          <Button variant="outline" size="lg" className="gap-2 border-border px-6 text-sm sm:px-8 sm:text-base" asChild>
+            <Link to="/auth">
+              Create Account
+            </Link>
           </Button>
         </motion.div>
 
-        {/* Stats */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
