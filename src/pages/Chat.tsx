@@ -699,7 +699,9 @@ const Chat = () => {
                       }`}
                     >
                       {msg.role === "assistant" ? (
-                        <MarkdownRenderer content={msg.content} />
+                        <Suspense fallback={<span>{msg.content}</span>}>
+                          <MarkdownRenderer content={msg.content} />
+                        </Suspense>
                       ) : (
                         msg.content
                       )}
