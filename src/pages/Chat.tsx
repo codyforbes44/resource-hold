@@ -736,7 +736,13 @@ const Chat = () => {
                 <SelectGroup key={group.label}>
                   <SelectLabel>{group.label}</SelectLabel>
                   {group.models.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
+                    <SelectItem
+                      key={m.value}
+                      value={m.value}
+                      disabled={m.isDisabled}
+                      className={m.isDisabled ? "opacity-40 cursor-not-allowed" : ""}
+                      title={m.isDisabled ? `Not compatible with: ${m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}` : undefined}
+                    >
                       {m.label}
                     </SelectItem>
                   ))}
