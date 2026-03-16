@@ -54,13 +54,15 @@ const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePan
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
 
-const MODEL_GROUPS = [
+const ALL_MODEL_GROUPS = [
   {
     label: "Google",
     models: [
       { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
       { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
       { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+      { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
     ],
   },
   {
@@ -68,6 +70,8 @@ const MODEL_GROUPS = [
     models: [
       { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
       { value: "openai/gpt-5", label: "GPT-5" },
+      { value: "openai/gpt-5-nano", label: "GPT-5 Nano" },
+      { value: "openai/gpt-5.2", label: "GPT-5.2" },
     ],
   },
   {
@@ -100,7 +104,8 @@ const Chat = () => {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState(MODEL_GROUPS[0].models[0].value);
+  const [model, setModel] = useState(ALL_MODEL_GROUPS[0].models[0].value);
+  const [allowedModels, setAllowedModels] = useState<string[] | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -121,6 +126,45 @@ const Chat = () => {
       prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
     );
   };
+
+  // Fetch allowed models based on access control
+  useEffect(() => {
+    const fetchAllowedModels = async () => {
+      try {
+        const { data } = await supabase
+          .from("model_access_defaults")
+          .select("model, enabled, visitor_enabled");
+
+        if (!data) return;
+
+        if (user) {
+          // Fetch user-specific overrides
+          const { data: overrides } = await supabase
+            .from("user_model_overrides")
+            .select("model, enabled")
+            .eq("user_id", user.id);
+
+          const overrideMap = new Map(overrides?.map((o: any) => [o.model, o.enabled]) || []);
+          const allowed = data
+            .filter((m: any) => {
+              if (overrideMap.has(m.model)) return overrideMap.get(m.model);
+              return m.enabled;
+            })
+            .map((m: any) => m.model);
+          setAllowedModels(allowed);
+        } else {
+          const allowed = data
+            .filter((m: any) => m.visitor_enabled)
+            .map((m: any) => m.model);
+          setAllowedModels(allowed);
+        }
+      } catch {
+        // If fetch fails, allow all
+        setAllowedModels(null);
+      }
+    };
+    fetchAllowedModels();
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -474,6 +518,15 @@ const Chat = () => {
   );
 
   const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
+
+  // Filter model groups by allowed models
+  const MODEL_GROUPS = ALL_MODEL_GROUPS
+    .map((group) => ({
+      ...group,
+      models: group.models.filter((m) => !allowedModels || allowedModels.includes(m.value)),
+    }))
+    .filter((group) => group.models.length > 0);
+
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
   return (

@@ -19,7 +19,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify the user's JWT and check admin role
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -27,7 +26,6 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
-    // Check admin role using service role client
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: roleData } = await adminClient
@@ -44,59 +42,78 @@ serve(async (req) => {
       );
     }
 
-    // Handle POST actions (role management)
+    // Handle POST actions
     if (req.method === "POST") {
       const body = await req.json();
-      const { action, user_id, role } = body;
+      const { action } = body;
 
       if (action === "assign_role") {
+        const { user_id, role } = body;
         const { error } = await adminClient
           .from("user_roles")
           .upsert({ user_id, role }, { onConflict: "user_id,role" });
         if (error) throw error;
-
-        // Audit log
         await adminClient.from("audit_logs").insert({
-          actor_id: user.id,
-          action: "assign_role",
-          target_type: "user",
-          target_id: user_id,
-          metadata: { role },
+          actor_id: user.id, action: "assign_role", target_type: "user", target_id: user_id, metadata: { role },
         });
-
-        return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (action === "revoke_role") {
+        const { user_id, role } = body;
         const { error } = await adminClient
           .from("user_roles")
           .delete()
           .eq("user_id", user_id)
           .eq("role", role);
         if (error) throw error;
-
         await adminClient.from("audit_logs").insert({
-          actor_id: user.id,
-          action: "revoke_role",
-          target_type: "user",
-          target_id: user_id,
-          metadata: { role },
+          actor_id: user.id, action: "revoke_role", target_type: "user", target_id: user_id, metadata: { role },
         });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-        return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (action === "set_model_default") {
+        const { model, enabled, visitor_enabled } = body;
+        const update: Record<string, any> = {};
+        if (typeof enabled === "boolean") update.enabled = enabled;
+        if (typeof visitor_enabled === "boolean") update.visitor_enabled = visitor_enabled;
+        const { error } = await adminClient
+          .from("model_access_defaults")
+          .update(update)
+          .eq("model", model);
+        if (error) throw error;
+        await adminClient.from("audit_logs").insert({
+          actor_id: user.id, action: "set_model_default", target_type: "model", target_id: model, metadata: update,
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "set_user_model_override") {
+        const { user_id, model, enabled } = body;
+        if (enabled === null) {
+          // Remove override
+          await adminClient
+            .from("user_model_overrides")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("model", model);
+        } else {
+          await adminClient
+            .from("user_model_overrides")
+            .upsert({ user_id, model, enabled }, { onConflict: "user_id,model" });
+        }
+        await adminClient.from("audit_logs").insert({
+          actor_id: user.id, action: "set_user_model_override", target_type: "user_model", target_id: `${user_id}:${model}`, metadata: { enabled },
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       throw new Error(`Unknown action: ${action}`);
     }
 
     // GET: Fetch admin dashboard data
-    const [profilesRes, conversationsRes, auditRes, userCountRes, convCountRes, msgCountRes] =
+    const [profilesRes, conversationsRes, auditRes, userCountRes, convCountRes, msgCountRes, modelDefaultsRes, userOverridesRes] =
       await Promise.all([
         adminClient.from("profiles").select("*").order("created_at", { ascending: false }).limit(100),
         adminClient.from("conversations").select("*, messages(count)").order("updated_at", { ascending: false }).limit(100),
@@ -104,6 +121,8 @@ serve(async (req) => {
         adminClient.from("profiles").select("*", { count: "exact", head: true }),
         adminClient.from("conversations").select("*", { count: "exact", head: true }),
         adminClient.from("messages").select("*", { count: "exact", head: true }),
+        adminClient.from("model_access_defaults").select("*").order("model"),
+        adminClient.from("user_model_overrides").select("*"),
       ]);
 
     const conversations = (conversationsRes.data || []).map((c: any) => ({
@@ -122,6 +141,8 @@ serve(async (req) => {
           totalConversations: convCountRes.count || 0,
           totalMessages: msgCountRes.count || 0,
         },
+        modelDefaults: modelDefaultsRes.data || [],
+        userModelOverrides: userOverridesRes.data || [],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
