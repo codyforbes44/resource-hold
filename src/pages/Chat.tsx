@@ -13,9 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Send, Trash2, LogOut, Mic, Home, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Plus, Send, Trash2, LogOut, Mic, Home, PanelLeftClose, PanelLeft, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import VoiceAgent from "@/components/chat/VoiceAgent";
+import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -42,8 +43,18 @@ const Chat = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [skillsPanelOpen, setSkillsPanelOpen] = useState(false);
+  const [skills, setSkills] = useState<Skill[]>(DEFAULT_SKILLS);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const enabledSkillIds = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
+
+  const toggleSkill = (id: string) => {
+    setSkills((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
+    );
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -86,7 +97,6 @@ const Chat = () => {
       .then(({ data }) => {
         if (data) setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
       });
-    // Set model from conversation
     const conv = conversations.find((c) => c.id === activeConv);
     if (conv) setModel(conv.model);
   }, [activeConv]);
@@ -123,7 +133,6 @@ const Chat = () => {
 
   const selectConversation = (id: string) => {
     setActiveConv(id);
-    // Close sidebar on mobile after selecting
     if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
@@ -138,7 +147,6 @@ const Chat = () => {
       if (!convId) return;
     }
 
-    // Save user message
     await supabase.from("messages").insert({
       conversation_id: convId,
       role: "user",
@@ -160,7 +168,11 @@ const Chat = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages, model }),
+        body: JSON.stringify({
+          messages: allMessages,
+          model,
+          skills: enabledSkillIds,
+        }),
         signal: controller.signal,
       });
 
@@ -202,7 +214,9 @@ const Chat = () => {
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 if (last?.role === "assistant") {
-                  return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantSoFar } : m);
+                  return prev.map((m, i) =>
+                    i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
+                  );
                 }
                 return [...prev, { role: "assistant", content: assistantSoFar }];
               });
@@ -214,7 +228,6 @@ const Chat = () => {
         }
       }
 
-      // Save assistant message
       if (assistantSoFar) {
         await supabase.from("messages").insert({
           conversation_id: convId,
@@ -222,7 +235,6 @@ const Chat = () => {
           content: assistantSoFar,
           model,
         });
-        // Update conversation title on first message
         if (allMessages.length === 1) {
           const title = userMsg.content.slice(0, 60);
           await supabase.from("conversations").update({ title }).eq("id", convId);
@@ -240,9 +252,16 @@ const Chat = () => {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [input, isStreaming, activeConv, messages, model, user]);
+  }, [input, isStreaming, activeConv, messages, model, user, enabledSkillIds]);
 
-  if (authLoading) return <div className="flex h-screen items-center justify-center bg-background"><p className="text-muted-foreground">Loading...</p></div>;
+  if (authLoading)
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+
+  const activeSkillCount = skills.filter((s) => s.enabled).length;
 
   return (
     <div className="flex h-screen bg-background">
@@ -263,7 +282,9 @@ const Chat = () => {
         <div className="flex items-center justify-between border-b border-border p-4">
           <div className="flex items-center gap-2">
             <img src={logoSrc} alt="gClaw" className="h-6 w-6" />
-            <span className="font-mono font-bold tracking-tight">gClaw <span className="text-muted-foreground font-normal">Chat</span></span>
+            <span className="font-mono font-bold tracking-tight">
+              gClaw <span className="text-muted-foreground font-normal">Chat</span>
+            </span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -290,7 +311,10 @@ const Chat = () => {
               <span className="truncate">{c.title}</span>
               <button
                 className="hidden text-muted-foreground hover:text-destructive group-hover:block"
-                onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteConversation(c.id);
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -301,7 +325,12 @@ const Chat = () => {
           <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate("/")}>
             <Home className="h-4 w-4" /> Home
           </Button>
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-destructive" onClick={signOut}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-destructive"
+            onClick={signOut}
+          >
             <LogOut className="h-4 w-4" /> Sign Out
           </Button>
         </div>
@@ -326,11 +355,27 @@ const Chat = () => {
             </SelectTrigger>
             <SelectContent>
               {MODELS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <div className="flex-1" />
+          <Button
+            variant={skillsPanelOpen ? "default" : "outline"}
+            size="sm"
+            className="gap-2"
+            onClick={() => setSkillsPanelOpen(!skillsPanelOpen)}
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">Skills</span>
+            {activeSkillCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary-foreground">
+                {activeSkillCount}
+              </span>
+            )}
+          </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowVoice(!showVoice)}>
             <Mic className="h-4 w-4" />
             <span className="hidden sm:inline">{showVoice ? "Hide Voice" : "Voice Agent"}</span>
@@ -338,9 +383,12 @@ const Chat = () => {
         </div>
 
         {showVoice ? (
-          <VoiceAgent userId={user!.id} onConversationSaved={(conv) => {
-            setConversations((prev) => [conv, ...prev]);
-          }} />
+          <VoiceAgent
+            userId={user!.id}
+            onConversationSaved={(conv) => {
+              setConversations((prev) => [conv, ...prev]);
+            }}
+          />
         ) : (
           <>
             {/* Messages */}
@@ -350,8 +398,26 @@ const Chat = () => {
                   <img src={logoSrc} alt="gClaw" className="h-16 w-16 opacity-30" />
                   <p className="text-lg text-muted-foreground">Start a conversation with gClaw</p>
                   <p className="max-w-md text-sm text-muted-foreground/60">
-                    Choose a model above and type a message below. Your conversations are saved automatically.
+                    Choose a model above and type a message below. Enable skills via the{" "}
+                    <Sparkles className="inline h-3.5 w-3.5" /> button to give gClaw superpowers.
                   </p>
+                  {/* Skill chips */}
+                  <div className="flex flex-wrap justify-center gap-2 mt-2">
+                    {skills.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => toggleSkill(s.id)}
+                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                          s.enabled
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/20"
+                        }`}
+                      >
+                        <s.icon className="h-3 w-3" />
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {messages.map((msg, i) => (
@@ -364,7 +430,7 @@ const Chat = () => {
                     }`}
                   >
                     {msg.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&_img]:rounded-lg [&_img]:max-h-96 [&_img]:w-auto">
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
                     ) : (
@@ -376,16 +442,37 @@ const Chat = () => {
               <div ref={scrollRef} />
             </ScrollArea>
 
+            {/* Active skills indicator */}
+            {enabledSkillIds.length > 0 && (
+              <div className="flex items-center gap-2 border-t border-border/50 px-4 py-1.5 bg-primary/5">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <span className="text-[11px] text-muted-foreground">
+                  Active skills:{" "}
+                  {skills
+                    .filter((s) => s.enabled)
+                    .map((s) => s.name)
+                    .join(", ")}
+                </span>
+              </div>
+            )}
+
             {/* Input */}
             <div className="border-t border-border p-3 md:p-4">
               <form
-                onSubmit={(e) => { e.preventDefault(); send(); }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
+                }}
                 className="flex gap-2"
               >
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type a message..."
+                  placeholder={
+                    enabledSkillIds.length > 0
+                      ? "Ask anything — skills are active..."
+                      : "Type a message..."
+                  }
                   disabled={isStreaming}
                   className="flex-1"
                 />
@@ -397,6 +484,14 @@ const Chat = () => {
           </>
         )}
       </div>
+
+      {/* Skills Panel */}
+      <SkillsPanel
+        open={skillsPanelOpen}
+        onClose={() => setSkillsPanelOpen(false)}
+        skills={skills}
+        onToggleSkill={toggleSkill}
+      />
     </div>
   );
 };
