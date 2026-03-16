@@ -536,19 +536,47 @@ const Chat = () => {
 
   const activeSkillCount = skills.filter((s) => s.enabled).length;
 
+  // Determine which skills are actively enabled (excluding code_interpreter which all models support)
+  const activeSkillsForCompat = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
+
+  // Check if a model is incompatible with any enabled skill
+  const getIncompatibleSkills = (modelValue: string): string[] => {
+    const supported = MODEL_SKILL_COMPAT[modelValue] || [];
+    return activeSkillsForCompat.filter((skillId) => !supported.includes(skillId));
+  };
+
   const filteredConversations = conversations.filter(
     (c) => !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
 
-  // Filter model groups by allowed models
+  // Filter model groups by allowed models, add incompatibility info
   const MODEL_GROUPS = ALL_MODEL_GROUPS
     .map((group) => ({
       ...group,
-      models: group.models.filter((m) => !allowedModels || allowedModels.includes(m.value)),
+      models: group.models
+        .filter((m) => !allowedModels || allowedModels.includes(m.value))
+        .map((m) => ({
+          ...m,
+          incompatibleSkills: getIncompatibleSkills(m.value),
+          isDisabled: getIncompatibleSkills(m.value).length > 0,
+        })),
     }))
     .filter((group) => group.models.length > 0);
+
+  // Auto-switch model if current selection becomes incompatible
+  useEffect(() => {
+    const currentIncompat = getIncompatibleSkills(model);
+    if (currentIncompat.length > 0) {
+      const allModels = MODEL_GROUPS.flatMap((g) => g.models);
+      const firstCompatible = allModels.find((m) => !m.isDisabled);
+      if (firstCompatible) {
+        setModel(firstCompatible.value);
+        toast.info(`Switched to ${firstCompatible.label} — ${currentIncompat.map((s) => SKILL_LABELS[s] || s).join(", ")} not supported by previous model`);
+      }
+    }
+  }, [skills]);
 
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
