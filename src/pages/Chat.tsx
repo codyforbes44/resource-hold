@@ -565,18 +565,7 @@ const Chat = () => {
     }))
     .filter((group) => group.models.length > 0);
 
-  // Auto-switch model if current selection becomes incompatible
-  useEffect(() => {
-    const currentIncompat = getIncompatibleSkills(model);
-    if (currentIncompat.length > 0) {
-      const allModels = MODEL_GROUPS.flatMap((g) => g.models);
-      const firstCompatible = allModels.find((m) => !m.isDisabled);
-      if (firstCompatible) {
-        setModel(firstCompatible.value);
-        toast.info(`Switched to ${firstCompatible.label} — ${currentIncompat.map((s) => SKILL_LABELS[s] || s).join(", ")} not supported by previous model`);
-      }
-    }
-  }, [skills]);
+  // Auto-switch is handled via a separate effect above the early return
 
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
