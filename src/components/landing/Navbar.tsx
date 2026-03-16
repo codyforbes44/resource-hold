@@ -80,13 +80,22 @@ const Navbar = () => {
         </div>
 
         {/* CTA */}
-        <div className="hidden items-center gap-3 md:flex">
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
-            Docs
-          </Button>
-          <Button size="sm" className="glow-brand" asChild>
-            <Link to="/chat">Get Started</Link>
-          </Button>
+        <div className="hidden items-center gap-2 md:flex">
+          <ThemeToggle />
+          {user ? (
+            <Button size="sm" className="glow-brand" asChild>
+              <Link to="/chat">Open Chat</Link>
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
+                <Link to="/auth">Sign In</Link>
+              </Button>
+              <Button size="sm" className="glow-brand" asChild>
+                <Link to="/auth">Get Started</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile toggle */}
