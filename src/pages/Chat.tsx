@@ -41,6 +41,7 @@ import {
 import VoiceAgent from "@/components/chat/VoiceAgent";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import MarkdownRenderer from "@/components/chat/MarkdownRenderer";
+import KnowledgeBasePanel from "@/components/chat/KnowledgeBasePanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
