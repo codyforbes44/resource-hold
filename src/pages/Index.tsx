@@ -31,6 +31,7 @@ const Index = () => {
         <ComparisonTable />
         <RoadmapTimeline />
         <WhyItMatters />
+        <ArchitectureSection />
         <EcosystemSection />
         <FAQSection />
       </main>
