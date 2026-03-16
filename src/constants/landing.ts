@@ -33,7 +33,7 @@ export const NAV_LINKS = [
 // --- Hero Stats ---
 export const HERO_STATS = [
   { value: "5+", label: "AI Models" },
-  { value: "4", label: "Skill Modules" },
+  { value: "7", label: "Skill Modules" },
   { value: "100%", label: "Open Source" },
 ] as const;
 
