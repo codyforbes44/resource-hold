@@ -430,6 +430,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         fnName === "web_search" ? "🔍 Searching the web..."
         : fnName === "generate_image" ? "🎨 Generating image..."
         : fnName === "search_knowledge" ? "📚 Searching knowledge base..."
+        : fnName === "deep_research" ? "🔬 Researching across web & knowledge base..."
         : `⚡ Running ${fnName}...`;
       toolStatusChunks.push(
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
