@@ -127,6 +127,45 @@ const Chat = () => {
     );
   };
 
+  // Fetch allowed models based on access control
+  useEffect(() => {
+    const fetchAllowedModels = async () => {
+      try {
+        const { data } = await supabase
+          .from("model_access_defaults")
+          .select("model, enabled, visitor_enabled");
+
+        if (!data) return;
+
+        if (user) {
+          // Fetch user-specific overrides
+          const { data: overrides } = await supabase
+            .from("user_model_overrides")
+            .select("model, enabled")
+            .eq("user_id", user.id);
+
+          const overrideMap = new Map(overrides?.map((o: any) => [o.model, o.enabled]) || []);
+          const allowed = data
+            .filter((m: any) => {
+              if (overrideMap.has(m.model)) return overrideMap.get(m.model);
+              return m.enabled;
+            })
+            .map((m: any) => m.model);
+          setAllowedModels(allowed);
+        } else {
+          const allowed = data
+            .filter((m: any) => m.visitor_enabled)
+            .map((m: any) => m.model);
+          setAllowedModels(allowed);
+        }
+      } catch {
+        // If fetch fails, allow all
+        setAllowedModels(null);
+      }
+    };
+    fetchAllowedModels();
+  }, [user]);
+
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
   }, [user, authLoading, navigate]);
