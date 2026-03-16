@@ -7,9 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const EMBEDDING_MODEL = "google/gemini-2.5-flash-lite";
-const CHUNK_SIZE = 500; // ~500 tokens per chunk
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const EMBEDDING_MODEL = "gemini-2.5-flash-lite";
+const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
 
 function chunkText(text: string, chunkSize: number, overlap: number): string[] {
@@ -25,19 +25,15 @@ function chunkText(text: string, chunkSize: number, overlap: number): string[] {
 }
 
 function extractTextFromContent(content: string, mimeType: string): string {
-  // For plain text and markdown, return as-is
   if (mimeType?.startsWith("text/")) return content;
-  // For other formats, try to extract readable text
   return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
-  // Use the AI gateway with a tool call to extract a fixed-size vector
-  // We use Gemini flash-lite to generate a text representation, then hash it to a vector
-  const response = await fetch(AI_GATEWAY, {
+async function generateEmbedding(text: string, geminiKey: string): Promise<number[]> {
+  const response = await fetch(GEMINI_ENDPOINT, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${geminiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -92,14 +88,12 @@ async function generateEmbedding(text: string, apiKey: string): Promise<number[]
     throw new Error("Invalid embedding format");
   }
 
-  // Pad or truncate to exactly 768 dimensions
   if (embedding.length < 768) {
     embedding = [...embedding, ...new Array(768 - embedding.length).fill(0)];
   } else if (embedding.length > 768) {
     embedding = embedding.slice(0, 768);
   }
 
-  // Normalize values to [-1, 1]
   const maxAbs = Math.max(...embedding.map((v: number) => Math.abs(v)), 1);
   return embedding.map((v: number) => v / maxAbs);
 }
@@ -113,7 +107,7 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const geminiKey = Deno.env.get("GEMINI_API_KEY")!;
 
     // Verify user
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -124,7 +118,6 @@ serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Parse request
     const body = await req.json();
     const { action } = body;
 
@@ -133,7 +126,6 @@ serve(async (req) => {
       const { document_id } = body;
       if (!document_id) throw new Error("document_id required");
 
-      // Verify ownership
       const { data: doc } = await adminClient
         .from("knowledge_documents")
         .select("file_path")
@@ -143,10 +135,7 @@ serve(async (req) => {
 
       if (!doc) throw new Error("Document not found");
 
-      // Delete storage file
       await adminClient.storage.from("knowledge_documents").remove([doc.file_path]);
-
-      // Delete document (cascades to chunks)
       await adminClient.from("knowledge_documents").delete().eq("id", document_id);
 
       return new Response(JSON.stringify({ success: true }), {
@@ -154,12 +143,11 @@ serve(async (req) => {
       });
     }
 
-    // PROCESS action - process a document that was uploaded
+    // PROCESS action
     if (action === "process") {
       const { document_id } = body;
       if (!document_id) throw new Error("document_id required");
 
-      // Get document
       const { data: doc, error: docError } = await adminClient
         .from("knowledge_documents")
         .select("*")
@@ -169,14 +157,12 @@ serve(async (req) => {
 
       if (docError || !doc) throw new Error("Document not found");
 
-      // Update status to processing
       await adminClient
         .from("knowledge_documents")
         .update({ status: "processing" })
         .eq("id", document_id);
 
       try {
-        // Download file content
         const { data: fileData, error: downloadError } = await adminClient.storage
           .from("knowledge_documents")
           .download(doc.file_path);
@@ -190,15 +176,13 @@ serve(async (req) => {
           throw new Error("Document contains no extractable text");
         }
 
-        // Chunk the text
         const chunks = chunkText(cleanText, CHUNK_SIZE, CHUNK_OVERLAP);
         console.log(`Document ${document_id}: ${chunks.length} chunks from ${cleanText.length} chars`);
 
-        // Generate embeddings and insert chunks
         let successCount = 0;
         for (let i = 0; i < chunks.length; i++) {
           try {
-            const embedding = await generateEmbedding(chunks[i], lovableApiKey);
+            const embedding = await generateEmbedding(chunks[i], geminiKey);
 
             await adminClient.from("knowledge_chunks").insert({
               document_id,
@@ -211,16 +195,13 @@ serve(async (req) => {
             successCount++;
           } catch (embErr) {
             console.error(`Chunk ${i} embedding failed:`, embErr);
-            // Continue with other chunks
           }
 
-          // Small delay to avoid rate limiting
           if (i > 0 && i % 5 === 0) {
             await new Promise((r) => setTimeout(r, 1000));
           }
         }
 
-        // Update document status
         await adminClient
           .from("knowledge_documents")
           .update({

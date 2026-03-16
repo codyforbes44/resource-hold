@@ -7,9 +7,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
+
+// ── API Router ──
+
+function getApiConfig(model: string): { url: string; apiKey: string; modelName: string } {
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+
+  if (model.startsWith("openai/")) {
+    if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
+    return { url: OPENAI_ENDPOINT, apiKey: openaiKey, modelName: model.replace("openai/", "") };
+  }
+  // Default to Gemini for google/* and any other model
+  if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured");
+  return { url: GEMINI_ENDPOINT, apiKey: geminiKey, modelName: model.replace("google/", "") };
+}
 
 // ── Tool definitions ──
 
@@ -77,13 +93,16 @@ async function executeWebSearch(query: string): Promise<string> {
   }
 }
 
-async function executeImageGeneration(prompt: string, apiKey: string): Promise<string> {
+async function executeImageGeneration(prompt: string): Promise<string> {
+  // Image generation uses Gemini's image model directly
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!geminiKey) return "Image generation failed: GEMINI_API_KEY is not configured.";
   try {
-    const response = await fetch(AI_GATEWAY, {
+    const response = await fetch(GEMINI_ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${geminiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
+        model: "gemini-3.1-flash-image-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -104,21 +123,24 @@ async function executeImageGeneration(prompt: string, apiKey: string): Promise<s
   }
 }
 
-async function executeKnowledgeSearch(query: string, userId: string, lovableApiKey: string): Promise<string> {
+async function executeKnowledgeSearch(query: string, userId: string): Promise<string> {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) return "Knowledge search failed: GEMINI_API_KEY is not configured.";
+
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Generate embedding for the query using same approach as knowledge-upload
-    const embResponse = await fetch(AI_GATEWAY, {
+    // Generate embedding using Gemini directly
+    const embResponse = await fetch(GEMINI_ENDPOINT, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
+        Authorization: `Bearer ${geminiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
@@ -154,14 +176,12 @@ async function executeKnowledgeSearch(query: string, userId: string, lovableApiK
     let embedding = JSON.parse(toolCall.function.arguments).embedding;
     if (!Array.isArray(embedding)) return "Knowledge search failed: invalid embedding";
 
-    // Pad/truncate to 768
     if (embedding.length < 768) embedding = [...embedding, ...new Array(768 - embedding.length).fill(0)];
     else if (embedding.length > 768) embedding = embedding.slice(0, 768);
 
     const maxAbs = Math.max(...embedding.map((v: number) => Math.abs(v)), 1);
     embedding = embedding.map((v: number) => v / maxAbs);
 
-    // Search using the database function
     const { data: results, error: searchError } = await adminClient.rpc("search_knowledge_chunks", {
       _user_id: userId,
       _query_embedding: `[${embedding.join(",")}]`,
@@ -187,11 +207,11 @@ async function executeKnowledgeSearch(query: string, userId: string, lovableApiK
   }
 }
 
-async function executeTool(name: string, args: Record<string, any>, lovableApiKey: string, userId: string): Promise<string> {
+async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
-    case "generate_image": return await executeImageGeneration(args.prompt, lovableApiKey);
-    case "search_knowledge": return await executeKnowledgeSearch(args.query, userId, lovableApiKey);
+    case "generate_image": return await executeImageGeneration(args.prompt);
+    case "search_knowledge": return await executeKnowledgeSearch(args.query, userId);
     default: return `Unknown tool: ${name}`;
   }
 }
@@ -202,7 +222,6 @@ function validateAndSanitize(messages: any[]): any[] {
   if (!Array.isArray(messages)) throw new Error("Messages must be an array");
   if (messages.length === 0) throw new Error("Messages array cannot be empty");
 
-  // Truncate to last N messages to prevent abuse
   const truncated = messages.slice(-MAX_HISTORY_MESSAGES);
 
   return truncated.map((msg) => {
@@ -233,8 +252,6 @@ function validateModel(model: string): string {
   return ALLOWED_MODELS.includes(model) ? model : "google/gemini-3-flash-preview";
 }
 
-// ── Error response helper ──
-
 function errorResponse(status: number, message: string) {
   return new Response(
     JSON.stringify({ error: message }),
@@ -249,8 +266,6 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // Extract user ID for knowledge base search
     let userId: string | null = null;
@@ -270,6 +285,7 @@ serve(async (req) => {
     const messages = validateAndSanitize(body.messages);
     const selectedModel = validateModel(body.model || "google/gemini-3-flash-preview");
     const enabledSkills: string[] = Array.isArray(body.skills) ? body.skills : [];
+    const { url: apiUrl, apiKey, modelName } = getApiConfig(selectedModel);
 
     // Build tools array
     const tools: any[] = [];
@@ -287,16 +303,16 @@ When you use a tool and get results, synthesize the information into a helpful r
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
-      const response = await fetch(AI_GATEWAY, {
+      const response = await fetch(apiUrl, {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: selectedModel, messages: fullMessages, stream: true }),
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: modelName, messages: fullMessages, stream: true }),
       });
 
       if (!response.ok) {
         const status = response.status;
         const t = await response.text();
-        console.error("AI gateway error:", status, t);
+        console.error("API error:", status, t);
         return errorResponse(
           status,
           status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
@@ -309,16 +325,16 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // ── With tools: non-streaming first ──
-    const initialResponse = await fetch(AI_GATEWAY, {
+    const initialResponse = await fetch(apiUrl, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: selectedModel, messages: fullMessages, tools, tool_choice: "auto" }),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelName, messages: fullMessages, tools, tool_choice: "auto" }),
     });
 
     if (!initialResponse.ok) {
       const status = initialResponse.status;
       const t = await initialResponse.text();
-      console.error("AI gateway error:", status, t);
+      console.error("API error:", status, t);
       return errorResponse(
         status,
         status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
@@ -355,7 +371,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
       );
 
-      const result = await executeTool(fnName, fnArgs, LOVABLE_API_KEY, userId || "");
+      const result = await executeTool(fnName, fnArgs, userId || "");
 
       if (result.startsWith("IMAGE_DATA:")) {
         const imageDataUrl = result.slice(11);
@@ -369,15 +385,15 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // Stream final response with tool results
-    const finalResponse = await fetch(AI_GATEWAY, {
+    const finalResponse = await fetch(apiUrl, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: selectedModel, messages: toolMessages, stream: true }),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelName, messages: toolMessages, stream: true }),
     });
 
     if (!finalResponse.ok) {
       const t = await finalResponse.text();
-      console.error("Final AI response error:", finalResponse.status, t);
+      console.error("Final API response error:", finalResponse.status, t);
       return errorResponse(500, "AI error after tool execution");
     }
 
