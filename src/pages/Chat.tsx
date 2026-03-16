@@ -39,6 +39,7 @@ import {
   ShieldCheck,
   Check,
   Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
