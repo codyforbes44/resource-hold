@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import OverviewSection from "@/components/landing/OverviewSection";
 import FeaturesGrid from "@/components/landing/FeaturesGrid";
 import PartnersSection from "@/components/landing/PartnersSection";
-import RoadmapTimeline from "@/components/landing/RoadmapTimeline";
+
 import WhyItMatters from "@/components/landing/WhyItMatters";
 import ArchitectureSection from "@/components/landing/ArchitectureSection";
 import EcosystemSection from "@/components/landing/EcosystemSection";
@@ -31,7 +31,7 @@ const Index = () => {
         <FeaturesGrid />
         <ArchitectureSection />
         <WhyItMatters />
-        <RoadmapTimeline />
+        
         <EcosystemSection />
         <PressSection />
         <CommunityLinks />

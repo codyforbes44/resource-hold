@@ -26,7 +26,6 @@ export const NAV_LINKS = [
   { label: "Features", href: "#features" },
   { label: "Architecture", href: "#architecture" },
   { label: "Ecosystem", href: "#ecosystem" },
-  { label: "Roadmap", href: "#roadmap" },
   { label: "FAQ", href: "#faq" },
 ] as const;
 
@@ -376,5 +375,4 @@ export const FOOTER_LINKS = [
   { label: "Documentation", href: "#faq" },
   { label: "Architecture", href: "#architecture" },
   { label: "Ecosystem", href: "#ecosystem" },
-  { label: "Roadmap", href: "#roadmap" },
 ] as const;
