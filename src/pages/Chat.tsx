@@ -100,7 +100,7 @@ const Chat = () => {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState(MODELS[0].value);
+  const [model, setModel] = useState(MODEL_GROUPS[0].models[0].value);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
