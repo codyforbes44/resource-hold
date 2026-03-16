@@ -186,6 +186,30 @@ export type Database = {
           },
         ]
       }
+      model_access_defaults: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          model: string
+          updated_at: string
+          visitor_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          model: string
+          updated_at?: string
+          visitor_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          model?: string
+          updated_at?: string
+          visitor_enabled?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -209,6 +233,27 @@ export type Database = {
           display_name?: string | null
           id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_model_overrides: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          model: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          model: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          model?: string
           user_id?: string
         }
         Relationships: []
