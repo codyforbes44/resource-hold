@@ -12,6 +12,7 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("");
+  const { user } = useAuth();
 
   useEffect(() => {
     const onScroll = () => {
