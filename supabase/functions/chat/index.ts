@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,15 +104,94 @@ async function executeImageGeneration(prompt: string, apiKey: string): Promise<s
   }
 }
 
-async function executeKnowledgeSearch(query: string): Promise<string> {
-  return `Knowledge base search for "${query}": No documents have been indexed yet. Upload documents to the knowledge base to enable this feature.`;
+async function executeKnowledgeSearch(query: string, userId: string, lovableApiKey: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Generate embedding for the query using same approach as knowledge-upload
+    const embResponse = await fetch(AI_GATEWAY, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          {
+            role: "system",
+            content: "You are an embedding generator. Given text, output exactly 768 floating point numbers between -1 and 1 separated by commas, representing a semantic embedding of the input text. Output ONLY the numbers, nothing else.",
+          },
+          { role: "user", content: query.slice(0, 2000) },
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "store_embedding",
+            description: "Store a 768-dimensional embedding vector",
+            parameters: {
+              type: "object",
+              properties: {
+                embedding: { type: "array", items: { type: "number" }, description: "768-dim vector" },
+              },
+              required: ["embedding"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "store_embedding" } },
+      }),
+    });
+
+    if (!embResponse.ok) return `Knowledge search failed: embedding generation error (${embResponse.status})`;
+
+    const embData = await embResponse.json();
+    const toolCall = embData.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) return "Knowledge search failed: no embedding generated";
+
+    let embedding = JSON.parse(toolCall.function.arguments).embedding;
+    if (!Array.isArray(embedding)) return "Knowledge search failed: invalid embedding";
+
+    // Pad/truncate to 768
+    if (embedding.length < 768) embedding = [...embedding, ...new Array(768 - embedding.length).fill(0)];
+    else if (embedding.length > 768) embedding = embedding.slice(0, 768);
+
+    const maxAbs = Math.max(...embedding.map((v: number) => Math.abs(v)), 1);
+    embedding = embedding.map((v: number) => v / maxAbs);
+
+    // Search using the database function
+    const { data: results, error: searchError } = await adminClient.rpc("search_knowledge_chunks", {
+      _user_id: userId,
+      _query_embedding: `[${embedding.join(",")}]`,
+      _match_count: 5,
+      _match_threshold: 0.2,
+    });
+
+    if (searchError) {
+      console.error("Knowledge search error:", searchError);
+      return `Knowledge search failed: ${searchError.message}`;
+    }
+
+    if (!results || results.length === 0) {
+      return "No relevant documents found in the knowledge base for this query. The user may need to upload relevant documents first.";
+    }
+
+    return results
+      .map((r: any, i: number) => `[Chunk ${i + 1}] (similarity: ${(r.similarity * 100).toFixed(1)}%)\n${r.content}`)
+      .join("\n\n---\n\n");
+  } catch (e) {
+    console.error("Knowledge search error:", e);
+    return `Knowledge search error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
 }
 
-async function executeTool(name: string, args: Record<string, any>, lovableApiKey: string): Promise<string> {
+async function executeTool(name: string, args: Record<string, any>, lovableApiKey: string, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
     case "generate_image": return await executeImageGeneration(args.prompt, lovableApiKey);
-    case "search_knowledge": return await executeKnowledgeSearch(args.query);
+    case "search_knowledge": return await executeKnowledgeSearch(args.query, userId, lovableApiKey);
     default: return `Unknown tool: ${name}`;
   }
 }
@@ -171,6 +251,21 @@ serve(async (req) => {
     const body = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Extract user ID for knowledge base search
+    let userId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await userClient.auth.getUser();
+        userId = user?.id || null;
+      } catch { /* proceed without userId */ }
+    }
 
     const messages = validateAndSanitize(body.messages);
     const selectedModel = validateModel(body.model || "google/gemini-3-flash-preview");
@@ -260,7 +355,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
       );
 
-      const result = await executeTool(fnName, fnArgs, LOVABLE_API_KEY);
+      const result = await executeTool(fnName, fnArgs, LOVABLE_API_KEY, userId || "");
 
       if (result.startsWith("IMAGE_DATA:")) {
         const imageDataUrl = result.slice(11);

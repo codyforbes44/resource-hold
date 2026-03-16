@@ -71,6 +71,86 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          document_id: string
+          embedding: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          chunk_index?: number
+          content: string
+          created_at?: string
+          document_id: string
+          embedding?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_documents: {
+        Row: {
+          chunk_count: number
+          created_at: string
+          error_message: string | null
+          file_path: string
+          file_size: number
+          filename: string
+          id: string
+          mime_type: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chunk_count?: number
+          created_at?: string
+          error_message?: string | null
+          file_path: string
+          file_size?: number
+          filename: string
+          id?: string
+          mime_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chunk_count?: number
+          created_at?: string
+          error_message?: string | null
+          file_path?: string
+          file_size?: number
+          filename?: string
+          id?: string
+          mime_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -195,6 +275,21 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      search_knowledge_chunks: {
+        Args: {
+          _match_count?: number
+          _match_threshold?: number
+          _query_embedding: string
+          _user_id: string
+        }
+        Returns: {
+          chunk_index: number
+          content: string
+          document_id: string
+          id: string
+          similarity: number
+        }[]
       }
     }
     Enums: {

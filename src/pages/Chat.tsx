@@ -41,6 +41,7 @@ import {
 import VoiceAgent from "@/components/chat/VoiceAgent";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import MarkdownRenderer from "@/components/chat/MarkdownRenderer";
+import KnowledgeBasePanel from "@/components/chat/KnowledgeBasePanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
@@ -838,15 +839,21 @@ const Chat = () => {
                 ))}
               </div>
             </div>
+            <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
           </DrawerContent>
         </Drawer>
       ) : (
-        <SkillsPanel
-          open={skillsPanelOpen}
-          onClose={() => setSkillsPanelOpen(false)}
-          skills={skills}
-          onToggleSkill={toggleSkill}
-        />
+        <>
+          <SkillsPanel
+            open={skillsPanelOpen}
+            onClose={() => setSkillsPanelOpen(false)}
+            skills={skills}
+            onToggleSkill={toggleSkill}
+            knowledgeBasePanel={
+              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+            }
+          />
+        </>
       )}
     </div>
   );

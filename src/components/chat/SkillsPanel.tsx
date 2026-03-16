@@ -59,9 +59,10 @@ interface SkillsPanelProps {
   onClose: () => void;
   skills: Skill[];
   onToggleSkill: (id: string) => void;
+  knowledgeBasePanel?: React.ReactNode;
 }
 
-const SkillsPanel = ({ open, onClose, skills, onToggleSkill }: SkillsPanelProps) => {
+const SkillsPanel = ({ open, onClose, skills, onToggleSkill, knowledgeBasePanel }: SkillsPanelProps) => {
   if (!open) return null;
 
   return (
@@ -117,6 +118,8 @@ const SkillsPanel = ({ open, onClose, skills, onToggleSkill }: SkillsPanelProps)
           ))}
         </div>
       </ScrollArea>
+
+      {knowledgeBasePanel}
 
       <div className="border-t border-border p-3">
         <p className="text-[10px] text-muted-foreground text-center">
