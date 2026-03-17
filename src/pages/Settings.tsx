@@ -62,6 +62,9 @@ const Settings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
