@@ -98,6 +98,7 @@ const Settings = () => {
         if (data) {
           setDefaultModel(data.default_model);
           setNotificationsEnabled(data.notifications_enabled);
+          if ((data as any).tts_voice_id) setTtsVoiceId((data as any).tts_voice_id);
         }
       });
   }, [user]);
