@@ -1,0 +1,1 @@
+ALTER TABLE public.user_settings ADD COLUMN tts_voice_id text NOT NULL DEFAULT 'JBFqnCBsd6RMkjVDRZzb';
