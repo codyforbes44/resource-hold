@@ -316,6 +316,23 @@ const Settings = () => {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label>TTS Voice</Label>
+                <p className="text-xs text-muted-foreground">Voice used for reading AI responses aloud</p>
+                <Select value={ttsVoiceId} onValueChange={setTtsVoiceId}>
+                  <SelectTrigger className="min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TTS_VOICES.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>
+                        {v.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex items-center justify-between rounded-lg border border-border p-4 min-h-[60px]">
                 <div>
                   <p className="text-sm font-medium">Theme</p>
