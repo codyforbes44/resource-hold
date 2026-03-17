@@ -791,6 +791,18 @@ const Chat = () => {
       } finally {
         setIsStreaming(false);
         abortRef.current = null;
+        // Auto-read the response if enabled
+        if (autoReadContentRef.current && autoReadEnabled) {
+          // Find the last assistant message index
+          setMessages((prev) => {
+            const lastAssistantIdx = prev.length - 1;
+            if (prev[lastAssistantIdx]?.role === "assistant") {
+              speakMessage(prev[lastAssistantIdx].content, lastAssistantIdx);
+            }
+            return prev;
+          });
+        }
+        autoReadContentRef.current = null;
       }
     },
     [input, isStreaming, activeConv, messages, model, user, enabledSkillIds]
