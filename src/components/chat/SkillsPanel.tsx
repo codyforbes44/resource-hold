@@ -97,7 +97,7 @@ const SkillsPanel = ({ open, onClose, skills, onToggleSkill, knowledgeBasePanel 
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="font-mono text-sm font-semibold">OpenClaw Skills</span>
+          <span className="font-mono text-sm font-semibold">gClaw Skills</span>
         </div>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
