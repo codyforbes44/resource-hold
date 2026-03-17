@@ -670,6 +670,16 @@ const Chat = () => {
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
+      if (autoReadContentRef.current && autoReadEnabled) {
+        setMessages((prev) => {
+          const lastIdx = prev.length - 1;
+          if (prev[lastIdx]?.role === "assistant") {
+            speakMessage(prev[lastIdx].content, lastIdx);
+          }
+          return prev;
+        });
+      }
+      autoReadContentRef.current = null;
     }
   };
 
