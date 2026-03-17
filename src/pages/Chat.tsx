@@ -537,7 +537,7 @@ const Chat = () => {
       toast.error("Failed to generate speech");
       console.error("TTS error:", e);
     }
-  }, [playingIdx]);
+  }, [playingIdx, ttsVoiceId]);
 
   const deleteMessage = async (idx: number) => {
     if (!activeConv) return;
