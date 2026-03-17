@@ -780,6 +780,8 @@ const Chat = () => {
             const finalMsgs = [...allMessages, { role: "assistant" as const, content: assistantSoFar }];
             saveLocalMessages(convId, finalMsgs);
           }
+
+          autoReadContentRef.current = assistantSoFar;
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
