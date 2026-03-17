@@ -40,6 +40,9 @@ import {
   Pencil,
   AlertTriangle,
   LogIn,
+  Volume2,
+  Square,
+  Loader2,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -185,6 +188,9 @@ const Chat = () => {
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [playingIdx, setPlayingIdx] = useState<number | null>(null);
+  const [loadingTtsIdx, setLoadingTtsIdx] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [signupNudgeDismissed, setSignupNudgeDismissed] = useState(() => {
     try { return localStorage.getItem("gclaw_signup_nudge_dismissed") === "1"; } catch { return false; }
   });
@@ -455,6 +461,81 @@ const Chat = () => {
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 2000);
   };
+
+  const stripMarkdown = (md: string) =>
+    md
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/`[^`]*`/g, "")
+      .replace(/!\[.*?\]\(.*?\)/g, "")
+      .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
+      .replace(/#{1,6}\s?/g, "")
+      .replace(/[*_~]{1,3}/g, "")
+      .replace(/>\s?/gm, "")
+      .replace(/\n{2,}/g, ". ")
+      .replace(/\n/g, " ")
+      .trim();
+
+  const speakMessage = useCallback(async (content: string, idx: number) => {
+    // Toggle off if already playing this message
+    if (playingIdx === idx) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlayingIdx(null);
+      return;
+    }
+
+    // Stop any current playback
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlayingIdx(null);
+
+    const text = stripMarkdown(content);
+    if (!text) return;
+
+    setLoadingTtsIdx(idx);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text }),
+        }
+      );
+
+      if (!response.ok) throw new Error("TTS request failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      setPlayingIdx(idx);
+      setLoadingTtsIdx(null);
+
+      audio.onended = () => {
+        setPlayingIdx(null);
+        audioRef.current = null;
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setPlayingIdx(null);
+        audioRef.current = null;
+        URL.revokeObjectURL(url);
+        toast.error("Audio playback failed");
+      };
+
+      await audio.play();
+    } catch (e) {
+      setLoadingTtsIdx(null);
+      setPlayingIdx(null);
+      toast.error("Failed to generate speech");
+      console.error("TTS error:", e);
+    }
+  }, [playingIdx]);
 
   const deleteMessage = async (idx: number) => {
     if (!activeConv) return;
@@ -1070,13 +1151,29 @@ const Chat = () => {
                         {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       </button>
                       {msg.role === "assistant" && (
-                        <button
-                          onClick={() => regenerateMessage(i)}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
-                          title="Regenerate"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => speakMessage(msg.content, i)}
+                            disabled={loadingTtsIdx === i}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"
+                            title={playingIdx === i ? "Stop" : "Read aloud"}
+                          >
+                            {loadingTtsIdx === i ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : playingIdx === i ? (
+                              <Square className="h-3 w-3" />
+                            ) : (
+                              <Volume2 className="h-3 w-3" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => regenerateMessage(i)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
+                            title="Regenerate"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => deleteMessage(i)}
