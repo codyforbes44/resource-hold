@@ -1151,13 +1151,29 @@ const Chat = () => {
                         {copiedIdx === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       </button>
                       {msg.role === "assistant" && (
-                        <button
-                          onClick={() => regenerateMessage(i)}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
-                          title="Regenerate"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => speakMessage(msg.content, i)}
+                            disabled={loadingTtsIdx === i}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"
+                            title={playingIdx === i ? "Stop" : "Read aloud"}
+                          >
+                            {loadingTtsIdx === i ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : playingIdx === i ? (
+                              <Square className="h-3 w-3" />
+                            ) : (
+                              <Volume2 className="h-3 w-3" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => regenerateMessage(i)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
+                            title="Regenerate"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => deleteMessage(i)}
