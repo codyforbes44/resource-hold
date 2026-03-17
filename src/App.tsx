@@ -11,10 +11,9 @@ import AuthGuard from "@/components/AuthGuard";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 // Route-level code splitting
-const Index = lazy(() => import("./pages/Index"));
+const Chat = lazy(() => import("./pages/Chat"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Chat = lazy(() => import("./pages/Chat"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -41,17 +40,10 @@ const App = () => (
             <BrowserRouter>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/" element={<Index />} />
+                  <Route path="/" element={<Chat />} />
+                  <Route path="/chat" element={<Chat />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route
-                    path="/chat"
-                    element={
-                      <AuthGuard>
-                        <Chat />
-                      </AuthGuard>
-                    }
-                  />
                   <Route
                     path="/settings"
                     element={
