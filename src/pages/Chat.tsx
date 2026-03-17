@@ -43,6 +43,7 @@ import {
   Volume2,
   Square,
   Loader2,
+  VolumeX,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -191,7 +192,9 @@ const Chat = () => {
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const [loadingTtsIdx, setLoadingTtsIdx] = useState<number | null>(null);
   const [ttsVoiceId, setTtsVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
+  const [autoReadEnabled, setAutoReadEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const autoReadContentRef = useRef<string | null>(null);
   const [signupNudgeDismissed, setSignupNudgeDismissed] = useState(() => {
     try { return localStorage.getItem("gclaw_signup_nudge_dismissed") === "1"; } catch { return false; }
   });
@@ -660,12 +663,23 @@ const Chat = () => {
           const allMsgs = [...trimmedMessages, { role: "assistant" as const, content: assistantSoFar }];
           saveLocalMessages(activeConv, allMsgs);
         }
+        autoReadContentRef.current = assistantSoFar;
       }
     } catch (err: any) {
       if (err.name !== "AbortError") toast.error("Regeneration failed");
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
+      if (autoReadContentRef.current && autoReadEnabled) {
+        setMessages((prev) => {
+          const lastIdx = prev.length - 1;
+          if (prev[lastIdx]?.role === "assistant") {
+            speakMessage(prev[lastIdx].content, lastIdx);
+          }
+          return prev;
+        });
+      }
+      autoReadContentRef.current = null;
     }
   };
 
@@ -776,6 +790,8 @@ const Chat = () => {
             const finalMsgs = [...allMessages, { role: "assistant" as const, content: assistantSoFar }];
             saveLocalMessages(convId, finalMsgs);
           }
+
+          autoReadContentRef.current = assistantSoFar;
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -785,6 +801,18 @@ const Chat = () => {
       } finally {
         setIsStreaming(false);
         abortRef.current = null;
+        // Auto-read the response if enabled
+        if (autoReadContentRef.current && autoReadEnabled) {
+          // Find the last assistant message index
+          setMessages((prev) => {
+            const lastAssistantIdx = prev.length - 1;
+            if (prev[lastAssistantIdx]?.role === "assistant") {
+              speakMessage(prev[lastAssistantIdx].content, lastAssistantIdx);
+            }
+            return prev;
+          });
+        }
+        autoReadContentRef.current = null;
       }
     },
     [input, isStreaming, activeConv, messages, model, user, enabledSkillIds]
@@ -1248,6 +1276,16 @@ const Chat = () => {
                     </span>
                   )}
                 </div>
+                <Button
+                  type="button"
+                  variant={autoReadEnabled ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setAutoReadEnabled((v) => !v)}
+                  className="min-h-[44px] min-w-[44px] shrink-0"
+                  title={autoReadEnabled ? "Auto-read on — click to disable" : "Auto-read off — click to enable"}
+                >
+                  {autoReadEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                </Button>
                 <Button type="submit" disabled={isStreaming || !input.trim()} className="min-h-[44px] min-w-[44px]">
                   <Send className="h-4 w-4" />
                 </Button>
