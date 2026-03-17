@@ -663,6 +663,7 @@ const Chat = () => {
           const allMsgs = [...trimmedMessages, { role: "assistant" as const, content: assistantSoFar }];
           saveLocalMessages(activeConv, allMsgs);
         }
+        autoReadContentRef.current = assistantSoFar;
       }
     } catch (err: any) {
       if (err.name !== "AbortError") toast.error("Regeneration failed");
