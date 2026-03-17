@@ -13,6 +13,7 @@ import Footer from "@/components/landing/Footer";
 import PressSection from "@/components/landing/PressSection";
 import NewsletterSection from "@/components/landing/NewsletterSection";
 import CommunityLinks from "@/components/landing/CommunityLinks";
+import ScrollToTop from "@/components/landing/ScrollToTop";
 
 const Index = () => {
   return (
