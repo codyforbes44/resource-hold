@@ -178,6 +178,9 @@ const Chat = () => {
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [signupNudgeDismissed, setSignupNudgeDismissed] = useState(() => {
+    try { return localStorage.getItem("gclaw_signup_nudge_dismissed") === "1"; } catch { return false; }
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
