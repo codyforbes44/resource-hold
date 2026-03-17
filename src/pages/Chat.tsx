@@ -1276,6 +1276,16 @@ const Chat = () => {
                     </span>
                   )}
                 </div>
+                <Button
+                  type="button"
+                  variant={autoReadEnabled ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setAutoReadEnabled((v) => !v)}
+                  className="min-h-[44px] min-w-[44px] shrink-0"
+                  title={autoReadEnabled ? "Auto-read on — click to disable" : "Auto-read off — click to enable"}
+                >
+                  {autoReadEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                </Button>
                 <Button type="submit" disabled={isStreaming || !input.trim()} className="min-h-[44px] min-w-[44px]">
                   <Send className="h-4 w-4" />
                 </Button>
