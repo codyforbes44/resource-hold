@@ -462,6 +462,81 @@ const Chat = () => {
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
+  const stripMarkdown = (md: string) =>
+    md
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/`[^`]*`/g, "")
+      .replace(/!\[.*?\]\(.*?\)/g, "")
+      .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
+      .replace(/#{1,6}\s?/g, "")
+      .replace(/[*_~]{1,3}/g, "")
+      .replace(/>\s?/gm, "")
+      .replace(/\n{2,}/g, ". ")
+      .replace(/\n/g, " ")
+      .trim();
+
+  const speakMessage = useCallback(async (content: string, idx: number) => {
+    // Toggle off if already playing this message
+    if (playingIdx === idx) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlayingIdx(null);
+      return;
+    }
+
+    // Stop any current playback
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlayingIdx(null);
+
+    const text = stripMarkdown(content);
+    if (!text) return;
+
+    setLoadingTtsIdx(idx);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text }),
+        }
+      );
+
+      if (!response.ok) throw new Error("TTS request failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      setPlayingIdx(idx);
+      setLoadingTtsIdx(null);
+
+      audio.onended = () => {
+        setPlayingIdx(null);
+        audioRef.current = null;
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setPlayingIdx(null);
+        audioRef.current = null;
+        URL.revokeObjectURL(url);
+        toast.error("Audio playback failed");
+      };
+
+      await audio.play();
+    } catch (e) {
+      setLoadingTtsIdx(null);
+      setPlayingIdx(null);
+      toast.error("Failed to generate speech");
+      console.error("TTS error:", e);
+    }
+  }, [playingIdx]);
+
   const deleteMessage = async (idx: number) => {
     if (!activeConv) return;
     if (user) {
