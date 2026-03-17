@@ -89,6 +89,13 @@ function deleteLocalConversation(convId: string) {
     localStorage.setItem(LS_MSGS_KEY, JSON.stringify(all));
   } catch { /* ignore */ }
 }
+function clearLocalChatData() {
+  try {
+    localStorage.removeItem(LS_CONVOS_KEY);
+    localStorage.removeItem(LS_MSGS_KEY);
+    localStorage.removeItem("gclaw_signup_nudge_dismissed");
+  } catch { /* ignore */ }
+}
 
 const ALL_MODEL_GROUPS = [
   {
