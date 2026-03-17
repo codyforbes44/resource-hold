@@ -34,9 +34,18 @@ const Navbar = () => {
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
-    const el = document.getElementById(href.slice(1));
-    el?.scrollIntoView({ behavior: "smooth" });
-    setMobileOpen(false);
+    const targetId = href.slice(1);
+    if (mobileOpen) {
+      setMobileOpen(false);
+      // Wait for menu close animation to finish before scrolling
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        el?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+    } else {
+      const el = document.getElementById(targetId);
+      el?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   return (
