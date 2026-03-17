@@ -401,10 +401,11 @@ serve(async (req) => {
     // Extract user ID for knowledge base search
     let userId: string | null = null;
     const authHeader = req.headers.get("Authorization");
-    if (authHeader) {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    // Skip the expensive getUser() call when the token is just the anon key (guest/visitor)
+    if (authHeader && !authHeader.endsWith(anonKey)) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
         const userClient = createClient(supabaseUrl, anonKey, {
           global: { headers: { Authorization: authHeader } },
         });
