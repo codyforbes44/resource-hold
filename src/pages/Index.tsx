@@ -41,6 +41,7 @@ const Index = () => {
       </main>
       <Footer />
 
+      <ScrollToTop />
       <div className="fixed bottom-4 right-4 z-50">
         <Badge
           variant="outline"
