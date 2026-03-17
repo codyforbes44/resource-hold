@@ -249,11 +249,12 @@ const Chat = () => {
     if (!user) return;
     supabase
       .from("user_settings")
-      .select("default_model")
+      .select("default_model, tts_voice_id")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
         if (data?.default_model) setModel(data.default_model);
+        if ((data as any)?.tts_voice_id) setTtsVoiceId((data as any).tts_voice_id);
       });
   }, [user]);
 
