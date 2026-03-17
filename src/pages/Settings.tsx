@@ -41,6 +41,23 @@ const MODEL_GROUPS = [
   },
 ];
 
+const TTS_VOICES = [
+  { value: "JBFqnCBsd6RMkjVDRZzb", label: "George (Default)" },
+  { value: "EXAVITQu4vr4xnSDxMaL", label: "Sarah" },
+  { value: "FGY2WhTYpPnrIDTdsKH5", label: "Laura" },
+  { value: "IKne3meq5aSn9XLyUdCD", label: "Charlie" },
+  { value: "CwhRBWXzGAHq8TQ4Fs17", label: "Roger" },
+  { value: "N2lVS1w4EtoT3dr4eOWO", label: "Callum" },
+  { value: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam" },
+  { value: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice" },
+  { value: "XrExE9yKIg1WjnnlVkGX", label: "Matilda" },
+  { value: "onwK4e9ZLuTAKqWW03F9", label: "Daniel" },
+  { value: "pFZP5JQG7iQjIQuC4Bku", label: "Lily" },
+  { value: "cgSgspJ2msm6clMCkdW9", label: "Jessica" },
+  { value: "cjVigY5qzO86Huf0OWal", label: "Eric" },
+  { value: "nPczCjzI2devNBz1zQrb", label: "Brian" },
+];
+
 const Settings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
