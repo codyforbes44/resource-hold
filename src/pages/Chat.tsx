@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -28,7 +28,6 @@ import {
   Trash2,
   LogOut,
   Mic,
-  Home,
   PanelLeftClose,
   PanelLeft,
   Sparkles,
@@ -40,6 +39,7 @@ import {
   Check,
   Pencil,
   AlertTriangle,
+  LogIn,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -54,6 +54,41 @@ const KnowledgeBasePanel = lazy(() => import("@/components/chat/KnowledgeBasePan
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; model: string; created_at: string };
+
+// ── localStorage helpers for visitors ──
+const LS_CONVOS_KEY = "gclaw_conversations";
+const LS_MSGS_KEY = "gclaw_messages";
+
+function loadLocalConversations(): Conversation[] {
+  try {
+    return JSON.parse(localStorage.getItem(LS_CONVOS_KEY) || "[]");
+  } catch { return []; }
+}
+function saveLocalConversations(convos: Conversation[]) {
+  localStorage.setItem(LS_CONVOS_KEY, JSON.stringify(convos));
+}
+function loadLocalMessages(convId: string): Msg[] {
+  try {
+    const all = JSON.parse(localStorage.getItem(LS_MSGS_KEY) || "{}");
+    return all[convId] || [];
+  } catch { return []; }
+}
+function saveLocalMessages(convId: string, msgs: Msg[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(LS_MSGS_KEY) || "{}");
+    all[convId] = msgs;
+    localStorage.setItem(LS_MSGS_KEY, JSON.stringify(all));
+  } catch { /* ignore */ }
+}
+function deleteLocalConversation(convId: string) {
+  try {
+    const convos = loadLocalConversations().filter((c) => c.id !== convId);
+    saveLocalConversations(convos);
+    const all = JSON.parse(localStorage.getItem(LS_MSGS_KEY) || "{}");
+    delete all[convId];
+    localStorage.setItem(LS_MSGS_KEY, JSON.stringify(all));
+  } catch { /* ignore */ }
+}
 
 const ALL_MODEL_GROUPS = [
   {
@@ -85,7 +120,6 @@ const ALL_MODEL_GROUPS = [
   },
 ];
 
-// Skill-to-model compatibility: which skills each model handles well
 const MODEL_SKILL_COMPAT: Record<string, string[]> = {
   "google/gemini-3-flash-preview": ["web_search", "code_interpreter", "image_generation", "knowledge_base", "deep_research", "memory", "browser"],
   "google/gemini-2.5-flash": ["web_search", "code_interpreter", "image_generation", "knowledge_base", "deep_research", "memory", "browser"],
@@ -127,6 +161,8 @@ const Chat = () => {
   const { isAdmin } = useUserRole();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const isGuest = !user;
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -165,7 +201,6 @@ const Chat = () => {
         if (!data) return;
 
         if (user) {
-          // Fetch user-specific overrides
           const { data: overrides } = await supabase
             .from("user_model_overrides")
             .select("model, enabled")
@@ -186,17 +221,13 @@ const Chat = () => {
           setAllowedModels(allowed);
         }
       } catch {
-        // If fetch fails, allow all
         setAllowedModels(null);
       }
     };
     fetchAllowedModels();
   }, [user]);
 
-  useEffect(() => {
-    if (!authLoading && !user) navigate("/auth");
-  }, [user, authLoading, navigate]);
-
+  // Load user settings (default model) — only for authenticated users
   useEffect(() => {
     if (!user) return;
     supabase
@@ -220,7 +251,6 @@ const Chat = () => {
     const supported = MODEL_SKILL_COMPAT[model] || [];
     const incompatible = activeSkillsForSwitch.filter((skillId) => !supported.includes(skillId));
     if (incompatible.length > 0) {
-      // Find first compatible model from allowed models
       const allAllowed = ALL_MODEL_GROUPS.flatMap((g) => g.models)
         .filter((m) => !allowedModels || allowedModels.includes(m.value));
       const firstCompatible = allAllowed.find((m) => {
@@ -234,51 +264,58 @@ const Chat = () => {
     }
   }, [skills, allowedModels]);
 
+  // Load conversations — DB for auth'd, localStorage for guests
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("conversations")
-      .select("*")
-      .order("updated_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setConversations(data as Conversation[]);
-      });
+    if (user) {
+      supabase
+        .from("conversations")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .then(({ data }) => {
+          if (data) setConversations(data as Conversation[]);
+        });
 
-    const channel = supabase
-      .channel("conversations-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations" },
-        () => {
-          supabase
-            .from("conversations")
-            .select("*")
-            .order("updated_at", { ascending: false })
-            .then(({ data }) => {
-              if (data) setConversations(data as Conversation[]);
-            });
-        }
-      )
-      .subscribe();
+      const channel = supabase
+        .channel("conversations-realtime")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "conversations" },
+          () => {
+            supabase
+              .from("conversations")
+              .select("*")
+              .order("updated_at", { ascending: false })
+              .then(({ data }) => {
+                if (data) setConversations(data as Conversation[]);
+              });
+          }
+        )
+        .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => { supabase.removeChannel(channel); };
+    } else {
+      setConversations(loadLocalConversations());
+    }
   }, [user]);
 
+  // Load messages when conversation changes
   useEffect(() => {
     if (!activeConv) {
       setMessages([]);
       return;
     }
-    supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", activeConv)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        if (data) setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
-      });
+    if (user) {
+      supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", activeConv)
+        .order("created_at", { ascending: true })
+        .then(({ data }) => {
+          if (data) setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
+        });
+    } else {
+      setMessages(loadLocalMessages(activeConv));
+    }
     const conv = conversations.find((c) => c.id === activeConv);
     if (conv) setModel(conv.model);
   }, [activeConv]);
@@ -288,24 +325,44 @@ const Chat = () => {
   }, [messages]);
 
   const createConversation = async () => {
-    const { data, error } = await supabase
-      .from("conversations")
-      .insert({ user_id: user!.id, model })
-      .select()
-      .single();
-    if (error) {
-      toast.error("Failed to create conversation");
-      return null;
+    if (user) {
+      const { data, error } = await supabase
+        .from("conversations")
+        .insert({ user_id: user.id, model })
+        .select()
+        .single();
+      if (error) {
+        toast.error("Failed to create conversation");
+        return null;
+      }
+      const conv = data as Conversation;
+      setConversations((prev) => [conv, ...prev]);
+      setActiveConv(conv.id);
+      setMessages([]);
+      return conv.id;
+    } else {
+      // Guest: localStorage
+      const conv: Conversation = {
+        id: crypto.randomUUID(),
+        title: "New Chat",
+        model,
+        created_at: new Date().toISOString(),
+      };
+      const updated = [conv, ...conversations];
+      setConversations(updated);
+      saveLocalConversations(updated);
+      setActiveConv(conv.id);
+      setMessages([]);
+      return conv.id;
     }
-    const conv = data as Conversation;
-    setConversations((prev) => [conv, ...prev]);
-    setActiveConv(conv.id);
-    setMessages([]);
-    return conv.id;
   };
 
   const deleteConversation = async (id: string) => {
-    await supabase.from("conversations").delete().eq("id", id);
+    if (user) {
+      await supabase.from("conversations").delete().eq("id", id);
+    } else {
+      deleteLocalConversation(id);
+    }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeConv === id) {
       setActiveConv(null);
@@ -315,10 +372,14 @@ const Chat = () => {
 
   const renameConversation = async (id: string) => {
     if (!editTitle.trim()) return;
-    await supabase.from("conversations").update({ title: editTitle.trim() }).eq("id", id);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, title: editTitle.trim() } : c))
-    );
+    if (user) {
+      await supabase.from("conversations").update({ title: editTitle.trim() }).eq("id", id);
+    }
+    setConversations((prev) => {
+      const updated = prev.map((c) => (c.id === id ? { ...c, title: editTitle.trim() } : c));
+      if (!user) saveLocalConversations(updated);
+      return updated;
+    });
     setEditingConvId(null);
   };
 
@@ -335,15 +396,19 @@ const Chat = () => {
 
   const deleteMessage = async (idx: number) => {
     if (!activeConv) return;
-    const { data } = await supabase
-      .from("messages")
-      .select("id")
-      .eq("conversation_id", activeConv)
-      .order("created_at", { ascending: true });
-    if (data && data[idx]) {
-      await supabase.from("messages").delete().eq("id", data[idx].id);
+    if (user) {
+      const { data } = await supabase
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", activeConv)
+        .order("created_at", { ascending: true });
+      if (data && data[idx]) {
+        await supabase.from("messages").delete().eq("id", data[idx].id);
+      }
     }
-    setMessages((prev) => prev.filter((_, i) => i !== idx));
+    const updated = messages.filter((_, i) => i !== idx);
+    setMessages(updated);
+    if (!user && activeConv) saveLocalMessages(activeConv, updated);
   };
 
   const processStream = async (
@@ -393,15 +458,17 @@ const Chat = () => {
     const trimmedMessages = messages.slice(0, idx);
     setMessages(trimmedMessages);
 
-    const { data } = await supabase
-      .from("messages")
-      .select("id")
-      .eq("conversation_id", activeConv)
-      .order("created_at", { ascending: true });
-    if (data) {
-      const toDelete = data.slice(idx);
-      for (const m of toDelete) {
-        await supabase.from("messages").delete().eq("id", m.id);
+    if (user) {
+      const { data } = await supabase
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", activeConv)
+        .order("created_at", { ascending: true });
+      if (data) {
+        const toDelete = data.slice(idx);
+        for (const m of toDelete) {
+          await supabase.from("messages").delete().eq("id", m.id);
+        }
       }
     }
 
@@ -410,13 +477,16 @@ const Chat = () => {
     abortRef.current = controller;
 
     try {
-      const token = await getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) {
+        headers.Authorization = `Bearer ${await getAccessToken()}`;
+      } else {
+        headers.Authorization = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ messages: trimmedMessages, model, skills: enabledSkillIds }),
         signal: controller.signal,
       });
@@ -434,12 +504,17 @@ const Chat = () => {
       });
 
       if (assistantSoFar) {
-        await supabase.from("messages").insert({
-          conversation_id: activeConv,
-          role: "assistant",
-          content: assistantSoFar,
-          model,
-        });
+        if (user) {
+          await supabase.from("messages").insert({
+            conversation_id: activeConv,
+            role: "assistant",
+            content: assistantSoFar,
+            model,
+          });
+        } else {
+          const allMsgs = [...trimmedMessages, { role: "assistant" as const, content: assistantSoFar }];
+          saveLocalMessages(activeConv, allMsgs);
+        }
       }
     } catch (err: any) {
       if (err.name !== "AbortError") toast.error("Regeneration failed");
@@ -454,7 +529,6 @@ const Chat = () => {
       const text = (overrideInput || input).trim();
       if (!text || isStreaming) return;
 
-      // Validate message
       const validation = messageSchema.safeParse(text);
       if (!validation.success) {
         toast.error(validation.error.errors[0].message);
@@ -470,27 +544,35 @@ const Chat = () => {
         if (!convId) return;
       }
 
-      await supabase.from("messages").insert({
-        conversation_id: convId,
-        role: "user",
-        content: userMsg.content,
-      });
+      if (user) {
+        await supabase.from("messages").insert({
+          conversation_id: convId,
+          role: "user",
+          content: userMsg.content,
+        });
+      }
 
       const allMessages = [...messages, userMsg];
       setMessages(allMessages);
-      setIsStreaming(true);
 
+      // Save to localStorage for guests immediately
+      if (!user) saveLocalMessages(convId, allMessages);
+
+      setIsStreaming(true);
       const controller = new AbortController();
       abortRef.current = controller;
 
       try {
-        const token = await getAccessToken();
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (user) {
+          headers.Authorization = `Bearer ${await getAccessToken()}`;
+        } else {
+          headers.Authorization = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+        }
+
         const resp = await fetch(CHAT_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
           body: JSON.stringify({
             messages: allMessages,
             model,
@@ -522,18 +604,32 @@ const Chat = () => {
         });
 
         if (assistantSoFar) {
-          await supabase.from("messages").insert({
-            conversation_id: convId,
-            role: "assistant",
-            content: assistantSoFar,
-            model,
-          });
+          if (user) {
+            await supabase.from("messages").insert({
+              conversation_id: convId,
+              role: "assistant",
+              content: assistantSoFar,
+              model,
+            });
+          }
+
+          // Update conversation title on first message
           if (allMessages.length === 1) {
             const title = userMsg.content.slice(0, 60);
-            await supabase.from("conversations").update({ title }).eq("id", convId);
-            setConversations((prev) =>
-              prev.map((c) => (c.id === convId ? { ...c, title } : c))
-            );
+            if (user) {
+              await supabase.from("conversations").update({ title }).eq("id", convId);
+            }
+            setConversations((prev) => {
+              const updated = prev.map((c) => (c.id === convId ? { ...c, title } : c));
+              if (!user) saveLocalConversations(updated);
+              return updated;
+            });
+          }
+
+          // Save final messages to localStorage for guests
+          if (!user) {
+            const finalMsgs = [...allMessages, { role: "assistant" as const, content: assistantSoFar }];
+            saveLocalMessages(convId, finalMsgs);
           }
         }
       } catch (err: any) {
@@ -560,11 +656,8 @@ const Chat = () => {
     );
 
   const activeSkillCount = skills.filter((s) => s.enabled).length;
-
-  // Determine which skills are actively enabled (excluding code_interpreter which all models support)
   const activeSkillsForCompat = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
 
-  // Check if a model is incompatible with any enabled skill
   const getIncompatibleSkills = (modelValue: string): string[] => {
     const supported = MODEL_SKILL_COMPAT[modelValue] || [];
     return activeSkillsForCompat.filter((skillId) => !supported.includes(skillId));
@@ -576,7 +669,6 @@ const Chat = () => {
 
   const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
 
-  // Filter model groups by allowed models, add incompatibility info
   const MODEL_GROUPS = ALL_MODEL_GROUPS
     .map((group) => ({
       ...group,
@@ -589,8 +681,6 @@ const Chat = () => {
         })),
     }))
     .filter((group) => group.models.length > 0);
-
-  
 
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
 
@@ -696,25 +786,32 @@ const Chat = () => {
         </ScrollArea>
 
         <div className="border-t border-border p-2 space-y-1">
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/")}>
-            <Home className="h-4 w-4" /> Home
-          </Button>
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/settings")}>
-            <Settings className="h-4 w-4" /> Settings
-          </Button>
-          {isAdmin && (
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/admin")}>
-              <ShieldCheck className="h-4 w-4" /> Admin
+          {user ? (
+            <>
+              <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/settings")}>
+                <Settings className="h-4 w-4" /> Settings
+              </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/admin")}>
+                  <ShieldCheck className="h-4 w-4" /> Admin
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 text-destructive min-h-[44px]"
+                onClick={signOut}
+              >
+                <LogOut className="h-4 w-4" /> Sign Out
+              </Button>
+            </>
+          ) : (
+            <Button variant="default" size="sm" className="w-full justify-start gap-2 min-h-[44px] glow-brand" asChild>
+              <Link to="/auth">
+                <LogIn className="h-4 w-4" /> Sign in to save chats
+              </Link>
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-destructive min-h-[44px]"
-            onClick={signOut}
-          >
-            <LogOut className="h-4 w-4" /> Sign Out
-          </Button>
         </div>
       </div>
 
@@ -763,6 +860,16 @@ const Chat = () => {
             </SelectContent>
           </Select>
           <div className="flex-1" />
+
+          {/* Guest sign-in nudge in top bar */}
+          {isGuest && (
+            <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px] hidden sm:flex" asChild>
+              <Link to="/auth">
+                <LogIn className="h-3.5 w-3.5" /> Sign In
+              </Link>
+            </Button>
+          )}
+
           <ThemeToggle className="hidden sm:flex" />
           <Button
             variant={skillsPanelOpen ? "default" : "outline"}
@@ -778,13 +885,15 @@ const Chat = () => {
               </span>
             )}
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={() => setShowVoice(!showVoice)}>
-            <Mic className="h-4 w-4" />
-            <span className="hidden sm:inline">{showVoice ? "Hide" : "Voice"}</span>
-          </Button>
+          {user && (
+            <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={() => setShowVoice(!showVoice)}>
+              <Mic className="h-4 w-4" />
+              <span className="hidden sm:inline">{showVoice ? "Hide" : "Voice"}</span>
+            </Button>
+          )}
         </div>
 
-        {showVoice ? (
+        {showVoice && user ? (
           <div className={isMobile ? "fixed inset-0 z-50 bg-background flex flex-col" : "flex flex-1 flex-col"}>
             {isMobile && (
               <div className="flex items-center gap-2 border-b border-border px-4 py-3">
@@ -796,7 +905,7 @@ const Chat = () => {
             )}
             <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
             <VoiceAgent
-              userId={user!.id}
+              userId={user.id}
               onConversationSaved={(conv) => {
                 setConversations((prev) => [conv, ...prev]);
               }}
@@ -815,6 +924,11 @@ const Chat = () => {
                     Choose a model above and type a message below. Enable skills via the{" "}
                     <Sparkles className="inline h-3.5 w-3.5" /> button.
                   </p>
+                  {isGuest && (
+                    <p className="text-xs text-muted-foreground/50">
+                      <Link to="/auth" className="text-primary hover:underline">Sign in</Link> to save conversations across sessions.
+                    </p>
+                  )}
                   <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-lg">
                     {SUGGESTED_PROMPTS.map((prompt) => (
                       <button
@@ -1004,9 +1118,11 @@ const Chat = () => {
                 ))}
               </div>
             </div>
-            <Suspense fallback={null}>
-              <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
-            </Suspense>
+            {user && (
+              <Suspense fallback={null}>
+                <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+              </Suspense>
+            )}
           </DrawerContent>
         </Drawer>
       ) : (
@@ -1017,9 +1133,11 @@ const Chat = () => {
             skills={skills}
             onToggleSkill={toggleSkill}
             knowledgeBasePanel={
-              <Suspense fallback={null}>
-                <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
-              </Suspense>
+              user ? (
+                <Suspense fallback={null}>
+                  <KnowledgeBasePanel enabled={skills.find(s => s.id === "knowledge_base")?.enabled || false} />
+                </Suspense>
+              ) : undefined
             }
           />
         </>
