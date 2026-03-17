@@ -136,7 +136,7 @@ const Chat = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [skillsPanelOpen, setSkillsPanelOpen] = useState(false);
+  const [skillsPanelOpen, setSkillsPanelOpen] = useState(true);
   const [skills, setSkills] = useState<Skill[]>(DEFAULT_SKILLS);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
