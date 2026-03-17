@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, User, Settings2, Shield } from "lucide-react";
+import { ArrowLeft, Upload, User, Settings2, Shield, Play, Square, Loader2 } from "lucide-react";
 import { changePasswordSchema, displayNameSchema, getPasswordStrength } from "@/lib/validations";
 import logoSrc from "@/assets/logo-gclaw.png";
 
