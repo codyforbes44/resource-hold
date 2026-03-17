@@ -190,6 +190,7 @@ const Chat = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const [loadingTtsIdx, setLoadingTtsIdx] = useState<number | null>(null);
+  const [ttsVoiceId, setTtsVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [signupNudgeDismissed, setSignupNudgeDismissed] = useState(() => {
     try { return localStorage.getItem("gclaw_signup_nudge_dismissed") === "1"; } catch { return false; }
