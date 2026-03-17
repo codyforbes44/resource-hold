@@ -190,6 +190,7 @@ const Chat = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const [loadingTtsIdx, setLoadingTtsIdx] = useState<number | null>(null);
+  const [ttsVoiceId, setTtsVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [signupNudgeDismissed, setSignupNudgeDismissed] = useState(() => {
     try { return localStorage.getItem("gclaw_signup_nudge_dismissed") === "1"; } catch { return false; }
@@ -248,11 +249,12 @@ const Chat = () => {
     if (!user) return;
     supabase
       .from("user_settings")
-      .select("default_model")
+      .select("default_model, tts_voice_id")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
         if (data?.default_model) setModel(data.default_model);
+        if ((data as any)?.tts_voice_id) setTtsVoiceId((data as any).tts_voice_id);
       });
   }, [user]);
 
@@ -503,7 +505,7 @@ const Chat = () => {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, voiceId: ttsVoiceId }),
         }
       );
 
@@ -535,7 +537,7 @@ const Chat = () => {
       toast.error("Failed to generate speech");
       console.error("TTS error:", e);
     }
-  }, [playingIdx]);
+  }, [playingIdx, ttsVoiceId]);
 
   const deleteMessage = async (idx: number) => {
     if (!activeConv) return;

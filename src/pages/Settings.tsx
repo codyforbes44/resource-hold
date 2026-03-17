@@ -41,6 +41,23 @@ const MODEL_GROUPS = [
   },
 ];
 
+const TTS_VOICES = [
+  { value: "JBFqnCBsd6RMkjVDRZzb", label: "George (Default)" },
+  { value: "EXAVITQu4vr4xnSDxMaL", label: "Sarah" },
+  { value: "FGY2WhTYpPnrIDTdsKH5", label: "Laura" },
+  { value: "IKne3meq5aSn9XLyUdCD", label: "Charlie" },
+  { value: "CwhRBWXzGAHq8TQ4Fs17", label: "Roger" },
+  { value: "N2lVS1w4EtoT3dr4eOWO", label: "Callum" },
+  { value: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam" },
+  { value: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice" },
+  { value: "XrExE9yKIg1WjnnlVkGX", label: "Matilda" },
+  { value: "onwK4e9ZLuTAKqWW03F9", label: "Daniel" },
+  { value: "pFZP5JQG7iQjIQuC4Bku", label: "Lily" },
+  { value: "cgSgspJ2msm6clMCkdW9", label: "Jessica" },
+  { value: "cjVigY5qzO86Huf0OWal", label: "Eric" },
+  { value: "nPczCjzI2devNBz1zQrb", label: "Brian" },
+];
+
 const Settings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -49,6 +66,7 @@ const Settings = () => {
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [defaultModel, setDefaultModel] = useState("google/gemini-3-flash-preview");
+  const [ttsVoiceId, setTtsVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -80,6 +98,7 @@ const Settings = () => {
         if (data) {
           setDefaultModel(data.default_model);
           setNotificationsEnabled(data.notifications_enabled);
+          if ((data as any).tts_voice_id) setTtsVoiceId((data as any).tts_voice_id);
         }
       });
   }, [user]);
@@ -150,6 +169,7 @@ const Settings = () => {
           user_id: user.id,
           default_model: defaultModel,
           notifications_enabled: notificationsEnabled,
+          tts_voice_id: ttsVoiceId,
         }, { onConflict: "user_id" });
       if (error) throw error;
       toast.success("Preferences saved");
@@ -291,6 +311,23 @@ const Settings = () => {
                           </SelectItem>
                         ))}
                       </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>TTS Voice</Label>
+                <p className="text-xs text-muted-foreground">Voice used for reading AI responses aloud</p>
+                <Select value={ttsVoiceId} onValueChange={setTtsVoiceId}>
+                  <SelectTrigger className="min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TTS_VOICES.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>
+                        {v.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
