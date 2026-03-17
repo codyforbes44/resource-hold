@@ -89,6 +89,13 @@ function deleteLocalConversation(convId: string) {
     localStorage.setItem(LS_MSGS_KEY, JSON.stringify(all));
   } catch { /* ignore */ }
 }
+function clearLocalChatData() {
+  try {
+    localStorage.removeItem(LS_CONVOS_KEY);
+    localStorage.removeItem(LS_MSGS_KEY);
+    localStorage.removeItem("gclaw_signup_nudge_dismissed");
+  } catch { /* ignore */ }
+}
 
 const ALL_MODEL_GROUPS = [
   {
@@ -299,6 +306,58 @@ const Chat = () => {
     } else {
       setConversations(loadLocalConversations());
     }
+  }, [user]);
+
+  // Migrate localStorage conversations to DB when guest signs in
+  useEffect(() => {
+    if (!user) return;
+    const localConvos = loadLocalConversations();
+    if (localConvos.length === 0) return;
+
+    const migrate = async () => {
+      let migrated = 0;
+      for (const conv of localConvos) {
+        const localMsgs = loadLocalMessages(conv.id);
+        // Create conversation in DB
+        const { data: newConv, error: convErr } = await supabase
+          .from("conversations")
+          .insert({
+            user_id: user.id,
+            title: conv.title,
+            model: conv.model,
+          })
+          .select()
+          .single();
+
+        if (convErr || !newConv) continue;
+
+        // Insert messages
+        if (localMsgs.length > 0) {
+          const rows = localMsgs.map((m) => ({
+            conversation_id: newConv.id,
+            role: m.role,
+            content: m.content,
+          }));
+          await supabase.from("messages").insert(rows);
+        }
+        migrated++;
+      }
+
+      // Clear localStorage data
+      clearLocalChatData();
+
+      if (migrated > 0) {
+        toast.success(`Migrated ${migrated} conversation${migrated > 1 ? "s" : ""} to your account`);
+        // Refresh conversations from DB
+        const { data } = await supabase
+          .from("conversations")
+          .select("*")
+          .order("updated_at", { ascending: false });
+        if (data) setConversations(data as Conversation[]);
+      }
+    };
+
+    migrate();
   }, [user]);
 
   // Load messages when conversation changes
