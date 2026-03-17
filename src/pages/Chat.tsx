@@ -43,6 +43,7 @@ import {
   Volume2,
   Square,
   Loader2,
+  VolumeX,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
