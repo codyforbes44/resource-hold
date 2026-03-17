@@ -169,6 +169,7 @@ const Settings = () => {
           user_id: user.id,
           default_model: defaultModel,
           notifications_enabled: notificationsEnabled,
+          tts_voice_id: ttsVoiceId,
         }, { onConflict: "user_id" });
       if (error) throw error;
       toast.success("Preferences saved");
