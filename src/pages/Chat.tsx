@@ -178,6 +178,9 @@ const Chat = () => {
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [signupNudgeDismissed, setSignupNudgeDismissed] = useState(() => {
+    try { return localStorage.getItem("gclaw_signup_nudge_dismissed") === "1"; } catch { return false; }
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -914,6 +917,25 @@ const Chat = () => {
           </div>
         ) : (
           <>
+            {/* Guest sign-up nudge after 3+ conversations */}
+            {isGuest && !signupNudgeDismissed && conversations.length >= 3 && (
+              <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm">
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">You've started {conversations.length} chats!</span>{" "}
+                  <Link to="/auth" className="text-primary hover:underline font-medium">Sign up</Link> to keep them forever and unlock all features.
+                </p>
+                <button
+                  onClick={() => {
+                    setSignupNudgeDismissed(true);
+                    try { localStorage.setItem("gclaw_signup_nudge_dismissed", "1"); } catch {}
+                  }}
+                  className="shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors text-xs"
+                  aria-label="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             {/* Messages */}
             <ScrollArea className="flex-1 p-3 md:p-4">
               {messages.length === 0 && (
