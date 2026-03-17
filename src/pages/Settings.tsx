@@ -322,18 +322,86 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label>TTS Voice</Label>
                 <p className="text-xs text-muted-foreground">Voice used for reading AI responses aloud</p>
-                <Select value={ttsVoiceId} onValueChange={setTtsVoiceId}>
-                  <SelectTrigger className="min-h-[44px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TTS_VOICES.map((v) => (
-                      <SelectItem key={v.value} value={v.value}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={ttsVoiceId} onValueChange={setTtsVoiceId}>
+                    <SelectTrigger className="min-h-[44px] flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TTS_VOICES.map((v) => (
+                        <SelectItem key={v.value} value={v.value}>
+                          {v.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="min-h-[44px] min-w-[44px] shrink-0"
+                    disabled={loadingPreview}
+                    title="Preview voice"
+                    onClick={async () => {
+                      if (previewingVoice === ttsVoiceId) {
+                        previewAudioRef.current?.pause();
+                        previewAudioRef.current = null;
+                        setPreviewingVoice(null);
+                        return;
+                      }
+                      previewAudioRef.current?.pause();
+                      previewAudioRef.current = null;
+                      setLoadingPreview(true);
+                      setPreviewingVoice(null);
+                      try {
+                        const res = await fetch(
+                          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+                          {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                            },
+                            body: JSON.stringify({
+                              text: "Hello! This is a preview of how I sound. How do you like my voice?",
+                              voiceId: ttsVoiceId,
+                            }),
+                          }
+                        );
+                        if (!res.ok) throw new Error("Preview failed");
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const audio = new Audio(url);
+                        previewAudioRef.current = audio;
+                        setPreviewingVoice(ttsVoiceId);
+                        audio.onended = () => {
+                          setPreviewingVoice(null);
+                          previewAudioRef.current = null;
+                          URL.revokeObjectURL(url);
+                        };
+                        audio.onerror = () => {
+                          setPreviewingVoice(null);
+                          previewAudioRef.current = null;
+                          URL.revokeObjectURL(url);
+                        };
+                        await audio.play();
+                      } catch {
+                        toast.error("Failed to preview voice");
+                      } finally {
+                        setLoadingPreview(false);
+                      }
+                    }}
+                  >
+                    {loadingPreview ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : previewingVoice === ttsVoiceId ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border border-border p-4 min-h-[60px]">
