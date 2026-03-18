@@ -40,8 +40,8 @@ const App = () => (
             <BrowserRouter>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/" element={<Chat />} />
-                  <Route path="/chat" element={<Chat />} />
+                  <Route path="/" element={<AuthGuard><Chat /></AuthGuard>} />
+                  <Route path="/chat" element={<AuthGuard><Chat /></AuthGuard>} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route
