@@ -158,10 +158,13 @@ serve(async (req) => {
     // Support service-role calls with user_id_override for batch operations
     let userId: string;
     const token = authHeader.replace("Bearer ", "");
+    const xServiceRole = req.headers.get("x-service-role");
     
-    // Check if this is a service role call by trying to match the token
-    // We also accept an x-service-role header as fallback
-    const isServiceRole = token === serviceRoleKey || req.headers.get("x-service-role") === serviceRoleKey;
+    // With signing-keys, the Authorization header may be rewritten.
+    // Use x-service-role header as the reliable auth mechanism for batch ops.
+    const isServiceRole = token === serviceRoleKey || xServiceRole === serviceRoleKey;
+    
+    console.log("Auth check - isServiceRole:", isServiceRole, "hasXServiceRole:", !!xServiceRole, "tokenMatch:", token === serviceRoleKey, "tokenLen:", token?.length, "srkLen:", serviceRoleKey?.length);
     
     if (isServiceRole) {
       const body_peek = await req.clone().json();
