@@ -235,7 +235,7 @@ serve(async (req) => {
       }
 
       const title = scrapeData.data?.metadata?.title || new URL(url).hostname;
-      const filePath = `${user.id}/url-${Date.now()}.md`;
+      const filePath = `${userId}/url-${Date.now()}.md`;
 
       // Store scraped content in storage for consistency
       const blob = new Blob([markdown], { type: "text/markdown" });
