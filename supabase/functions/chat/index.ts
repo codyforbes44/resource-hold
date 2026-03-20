@@ -148,14 +148,18 @@ function parseAnthropicToolCalls(data: any): { content: string; tool_calls: any[
     if (block.type === "text") {
       textContent += block.text;
     } else if (block.type === "tool_use") {
-      toolCalls.push({
-        id: block.id,
-        type: "function",
-        function: {
-          name: block.name,
-          arguments: JSON.stringify(block.input),
-        },
-      });
+      try {
+        toolCalls.push({
+          id: block.id,
+          type: "function",
+          function: {
+            name: block.name,
+            arguments: typeof block.input === "string" ? block.input : JSON.stringify(block.input ?? {}),
+          },
+        });
+      } catch (e) {
+        console.error("Malformed tool_use block, skipping:", block, e);
+      }
     }
   }
 
