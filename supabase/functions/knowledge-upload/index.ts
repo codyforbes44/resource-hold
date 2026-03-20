@@ -155,11 +155,20 @@ serve(async (req) => {
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+    // Support service-role calls with user_id_override for batch operations
+    let userId: string;
+    if (authHeader === `Bearer ${serviceRoleKey}`) {
+      const body_peek = await req.clone().json();
+      if (!body_peek.user_id_override) throw new Error("Service role calls require user_id_override");
+      userId = body_peek.user_id_override;
+    } else {
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) throw new Error("Unauthorized");
+      userId = user.id;
+    }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
@@ -174,7 +183,7 @@ serve(async (req) => {
         .from("knowledge_documents")
         .select("file_path, source_url")
         .eq("id", document_id)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (!doc) throw new Error("Document not found");
@@ -226,7 +235,7 @@ serve(async (req) => {
       }
 
       const title = scrapeData.data?.metadata?.title || new URL(url).hostname;
-      const filePath = `${user.id}/url-${Date.now()}.md`;
+      const filePath = `${userId}/url-${Date.now()}.md`;
 
       // Store scraped content in storage for consistency
       const blob = new Blob([markdown], { type: "text/markdown" });
@@ -236,7 +245,7 @@ serve(async (req) => {
       const { data: doc, error: insertError } = await adminClient
         .from("knowledge_documents")
         .insert({
-          user_id: user.id,
+          user_id: userId,
           filename: title,
           file_path: filePath,
           file_size: markdown.length,
@@ -250,7 +259,7 @@ serve(async (req) => {
       if (insertError) throw insertError;
 
       try {
-        const successCount = await processAndIndex(adminClient, doc.id, user.id, markdown, lovableKey);
+        const successCount = await processAndIndex(adminClient, doc.id, userId, markdown, lovableKey);
 
         await adminClient
           .from("knowledge_documents")
@@ -283,7 +292,7 @@ serve(async (req) => {
         .from("knowledge_documents")
         .select("*")
         .eq("id", document_id)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (docError || !doc) throw new Error("Document not found");
@@ -344,7 +353,7 @@ serve(async (req) => {
           textContent = extractTextFromContent(textContent, doc.mime_type || "text/plain");
         }
 
-        const successCount = await processAndIndex(adminClient, document_id, user.id, textContent, lovableKey);
+        const successCount = await processAndIndex(adminClient, document_id, userId, textContent, lovableKey);
 
         await adminClient
           .from("knowledge_documents")
