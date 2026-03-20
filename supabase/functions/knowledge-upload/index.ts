@@ -157,12 +157,20 @@ serve(async (req) => {
 
     // Support service-role calls with user_id_override for batch operations
     let userId: string;
-    if (authHeader === `Bearer ${serviceRoleKey}`) {
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Check if this is a service role call by trying to match the token
+    // We also accept an x-service-role header as fallback
+    const isServiceRole = token === serviceRoleKey || req.headers.get("x-service-role") === serviceRoleKey;
+    
+    if (isServiceRole) {
       const body_peek = await req.clone().json();
       if (!body_peek.user_id_override) throw new Error("Service role calls require user_id_override");
       userId = body_peek.user_id_override;
+      console.log("Service role auth, user_id_override:", userId);
     } else {
-      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const userClient = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
       });
       const { data: { user }, error: authError } = await userClient.auth.getUser();
