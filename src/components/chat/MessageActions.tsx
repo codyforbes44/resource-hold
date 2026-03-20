@@ -1,6 +1,3 @@
-import { useState, useCallback, useRef } from "react";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Button } from "@/components/ui/button";
 import {
   Copy, Check, Volume2, Square, Loader2, RotateCcw, Trash2,
 } from "lucide-react";
@@ -9,7 +6,7 @@ interface MessageActionsProps {
   content: string;
   index: number;
   role: "user" | "assistant";
-  isVisible: boolean;
+  isMobileTapped: boolean;
   onCopy: (content: string, idx: number) => void;
   onSpeak?: (content: string, idx: number) => void;
   onRegenerate?: (idx: number) => void;
@@ -23,7 +20,7 @@ const MessageActions = ({
   content,
   index,
   role,
-  isVisible,
+  isMobileTapped,
   onCopy,
   onSpeak,
   onRegenerate,
@@ -32,12 +29,16 @@ const MessageActions = ({
   playingIdx,
   loadingTtsIdx,
 }: MessageActionsProps) => {
-  if (!isVisible) return null;
-
+  // On desktop: hidden by default, shown on group-hover (CSS)
+  // On mobile: hidden by default, shown when tapped (isMobileTapped)
   return (
-    <div className="absolute -bottom-6 right-0 flex items-center gap-1 z-10">
+    <div
+      className={`absolute -bottom-6 right-0 items-center gap-1 z-10 ${
+        isMobileTapped ? "flex" : "hidden group-hover:flex"
+      }`}
+    >
       <button
-        onClick={() => onCopy(content, index)}
+        onClick={(e) => { e.stopPropagation(); onCopy(content, index); }}
         className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
         title="Copy"
       >
@@ -47,7 +48,7 @@ const MessageActions = ({
         <>
           {onSpeak && (
             <button
-              onClick={() => onSpeak(content, index)}
+              onClick={(e) => { e.stopPropagation(); onSpeak(content, index); }}
               disabled={loadingTtsIdx === index}
               className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"
               title={playingIdx === index ? "Stop" : "Read aloud"}
@@ -63,7 +64,7 @@ const MessageActions = ({
           )}
           {onRegenerate && (
             <button
-              onClick={() => onRegenerate(index)}
+              onClick={(e) => { e.stopPropagation(); onRegenerate(index); }}
               className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-foreground"
               title="Regenerate"
             >
@@ -73,7 +74,7 @@ const MessageActions = ({
         </>
       )}
       <button
-        onClick={() => onDelete(index)}
+        onClick={(e) => { e.stopPropagation(); onDelete(index); }}
         className="flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border text-muted-foreground hover:text-destructive"
         title="Delete"
       >
