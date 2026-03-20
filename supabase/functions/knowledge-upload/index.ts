@@ -157,14 +157,20 @@ serve(async (req) => {
 
     // Support service-role calls with user_id_override for batch operations
     let userId: string;
-    const token = authHeader.replace("Bearer ", "");
-    const xServiceRole = req.headers.get("x-service-role");
     
-    // With signing-keys, the Authorization header may be rewritten.
-    // Use x-service-role header as the reliable auth mechanism for batch ops.
-    const isServiceRole = token === serviceRoleKey || xServiceRole === serviceRoleKey;
-    
-    console.log("Auth check - isServiceRole:", isServiceRole, "hasXServiceRole:", !!xServiceRole, "tokenMatch:", token === serviceRoleKey, "tokenLen:", token?.length, "srkLen:", serviceRoleKey?.length);
+    // Check if the caller has service_role by decoding the JWT claims
+    let isServiceRole = false;
+    try {
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const checkClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData } = await checkClient.auth.getClaims(token);
+      if (claimsData?.claims?.role === "service_role") {
+        isServiceRole = true;
+      }
+    } catch { /* not a service role token */ }
     
     if (isServiceRole) {
       const body_peek = await req.clone().json();
