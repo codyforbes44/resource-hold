@@ -129,6 +129,14 @@ const ALL_MODEL_GROUPS = [
       { value: "zephel/zephel-fast", label: "Zephel Fast" },
     ],
   },
+  {
+    label: "Anthropic",
+    models: [
+      { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4" },
+      { value: "anthropic/claude-opus-4", label: "Claude Opus 4" },
+      { value: "anthropic/claude-haiku-3.5", label: "Claude Haiku 3.5" },
+    ],
+  },
 ];
 
 const MODEL_SKILL_COMPAT: Record<string, string[]> = {
@@ -144,6 +152,9 @@ const MODEL_SKILL_COMPAT: Record<string, string[]> = {
   "zephel/zephel": ["web_search", "code_interpreter", "knowledge_base", "deep_research", "memory", "browser"],
   "zephel/zephel-pro": ["web_search", "code_interpreter", "knowledge_base", "deep_research", "memory", "browser"],
   "zephel/zephel-fast": ["web_search", "code_interpreter"],
+  "anthropic/claude-sonnet-4": ["web_search", "code_interpreter", "knowledge_base", "deep_research", "memory", "browser"],
+  "anthropic/claude-opus-4": ["web_search", "code_interpreter", "knowledge_base", "deep_research", "memory", "browser"],
+  "anthropic/claude-haiku-3.5": ["web_search", "code_interpreter"],
 };
 
 const SKILL_LABELS: Record<string, string> = {
