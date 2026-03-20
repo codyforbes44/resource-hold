@@ -2,12 +2,12 @@ import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import { Play, Square, Loader2 } from "lucide-react";
-import { ALL_MODEL_GROUPS } from "@/lib/models";
+import { GCLAW_MODELS } from "@/lib/models";
 
 const TTS_VOICES = [
   { value: "JBFqnCBsd6RMkjVDRZzb", label: "George (Default)" },
@@ -99,13 +99,13 @@ const PreferencesTab = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {ALL_MODEL_GROUPS.map((group) => (
-                <SelectGroup key={group.label}>
-                  <SelectLabel>{group.label}</SelectLabel>
-                  {group.models.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectGroup>
+              {GCLAW_MODELS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{m.label}</span>
+                    <span className="text-xs text-muted-foreground">{m.description}</span>
+                  </div>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
