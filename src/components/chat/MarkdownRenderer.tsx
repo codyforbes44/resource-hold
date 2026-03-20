@@ -67,10 +67,26 @@ const CodeBlock = ({
   );
 };
 
+/** Parse <think>...</think> blocks out of content */
+function parseThinkingBlocks(content: string): { thinking: string | null; rest: string } {
+  const match = content.match(/^<think>([\s\S]*?)<\/think>\s*/);
+  if (match) {
+    return { thinking: match[1], rest: content.slice(match[0].length) };
+  }
+  // Handle still-streaming thinking (no closing tag yet)
+  const openMatch = content.match(/^<think>([\s\S]*)$/);
+  if (openMatch) {
+    return { thinking: openMatch[1], rest: "" };
+  }
+  return { thinking: null, rest: content };
+}
+
 const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
+  const { thinking, rest } = useMemo(() => parseThinkingBlocks(content), [content]);
+
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-display prose-p:leading-relaxed prose-li:leading-relaxed">
-      <ReactMarkdown
+      {thinking !== null && <ThinkingBlock content={thinking} />}
         remarkPlugins={[remarkGfm]}
         components={{
           // ── Code ──
