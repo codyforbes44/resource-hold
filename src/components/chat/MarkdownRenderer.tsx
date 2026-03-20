@@ -86,7 +86,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-display prose-p:leading-relaxed prose-li:leading-relaxed">
-      {thinking !== null && <ThinkingBlock content={thinking} />}
+      {rest && <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           // ── Code ──
