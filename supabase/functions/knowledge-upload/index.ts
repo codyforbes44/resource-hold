@@ -155,11 +155,20 @@ serve(async (req) => {
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+    // Support service-role calls with user_id_override for batch operations
+    let userId: string;
+    if (authHeader === `Bearer ${serviceRoleKey}`) {
+      const body_peek = await req.clone().json();
+      if (!body_peek.user_id_override) throw new Error("Service role calls require user_id_override");
+      userId = body_peek.user_id_override;
+    } else {
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) throw new Error("Unauthorized");
+      userId = user.id;
+    }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
