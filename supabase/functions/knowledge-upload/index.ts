@@ -353,7 +353,7 @@ serve(async (req) => {
           textContent = extractTextFromContent(textContent, doc.mime_type || "text/plain");
         }
 
-        const successCount = await processAndIndex(adminClient, document_id, user.id, textContent, lovableKey);
+        const successCount = await processAndIndex(adminClient, document_id, userId, textContent, lovableKey);
 
         await adminClient
           .from("knowledge_documents")
