@@ -158,7 +158,7 @@ const ChatMessages = ({
                 content={msg.content}
                 index={i}
                 role={msg.role}
-                isVisible={isMobile ? activeActionIdx === i : true}
+                isMobileTapped={isMobile && activeActionIdx === i}
                 onCopy={onCopy}
                 onSpeak={msg.role === "assistant" ? onSpeak : undefined}
                 onRegenerate={msg.role === "assistant" ? onRegenerate : undefined}
