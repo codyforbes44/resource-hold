@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -6,6 +6,7 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "next-themes";
 import { Check, Copy, ExternalLink } from "lucide-react";
+import ThinkingBlock from "./ThinkingBlock";
 
 interface MarkdownRendererProps {
   content: string;
@@ -66,10 +67,26 @@ const CodeBlock = ({
   );
 };
 
+/** Parse <think>...</think> blocks out of content */
+function parseThinkingBlocks(content: string): { thinking: string | null; rest: string } {
+  const match = content.match(/^<think>([\s\S]*?)<\/think>\s*/);
+  if (match) {
+    return { thinking: match[1], rest: content.slice(match[0].length) };
+  }
+  // Handle still-streaming thinking (no closing tag yet)
+  const openMatch = content.match(/^<think>([\s\S]*)$/);
+  if (openMatch) {
+    return { thinking: openMatch[1], rest: "" };
+  }
+  return { thinking: null, rest: content };
+}
+
 const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
+  const { thinking, rest } = useMemo(() => parseThinkingBlocks(content), [content]);
+
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-display prose-p:leading-relaxed prose-li:leading-relaxed">
-      <ReactMarkdown
+      {rest && <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           // ── Code ──
@@ -285,8 +302,8 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
           },
         }}
       >
-        {content}
-      </ReactMarkdown>
+        {rest}
+      </ReactMarkdown>}
     </div>
   );
 };
