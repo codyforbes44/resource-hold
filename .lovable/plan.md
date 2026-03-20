@@ -27,3 +27,24 @@
 5. **Database** — `model_access_defaults` updated:
    - Deleted all 15 old provider model rows
    - Inserted 4 new tier rows (`gclaw/thinking` requires auth)
+
+## Completed: Knowledge Base Enhancement (URL + PDF + Lovable AI Embeddings)
+
+### What Was Done
+
+1. **Database** — Added `source_url` text column to `knowledge_documents` for URL-ingested content.
+
+2. **`supabase/functions/knowledge-upload/index.ts`** — Major upgrade:
+   - **Lovable AI Gateway**: Replaced direct `GEMINI_API_KEY` calls with `LOVABLE_API_KEY` via gateway for embeddings (consistent with chat function).
+   - **URL Ingestion**: New `ingest_url` action scrapes via Firecrawl, stores markdown, chunks & embeds.
+   - **PDF Support**: New PDF text extraction using Gemini vision model via Lovable AI gateway.
+   - **Re-indexing**: `processAndIndex` helper deletes old chunks before re-creating, enabling refresh.
+   - **Shared helper**: Extracted `processAndIndex()` for reuse across file and URL pipelines.
+
+3. **`src/components/chat/KnowledgeBasePanel.tsx`** — UI enhancements:
+   - **URL input**: Toggle-able URL field with "Add" button to ingest web pages.
+   - **PDF acceptance**: Added `.pdf` / `application/pdf` to accepted file types.
+   - **10MB limit**: Increased from 5MB to accommodate PDFs.
+   - **Refresh button**: URL-sourced docs show a refresh icon to re-scrape and re-index.
+   - **Globe icon**: URL-sourced docs display a globe icon instead of status icon.
+   - **Shared `callEdgeFunction` helper**: Reduced code duplication for edge function calls.
