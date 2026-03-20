@@ -811,7 +811,14 @@ When you use a tool and get results, synthesize the information into a helpful r
 
     for (const tc of toolCalls) {
       const fnName = tc.function.name;
-      const fnArgs = JSON.parse(tc.function.arguments || "{}");
+      let fnArgs: Record<string, any>;
+      try {
+        fnArgs = JSON.parse(tc.function.arguments || "{}");
+      } catch (parseErr) {
+        console.error(`Malformed tool_call arguments for ${fnName}:`, tc.function.arguments);
+        toolMessages.push({ role: "tool", tool_call_id: tc.id, content: `Error: malformed arguments for ${fnName}` });
+        continue;
+      }
       console.log(`Executing tool: ${fnName}`, fnArgs);
 
       const toolLabel =
