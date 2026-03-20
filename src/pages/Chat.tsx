@@ -5,22 +5,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import {
-  Mic, PanelLeft, Sparkles, AlertTriangle, LogIn,
+  Mic, PanelLeft, Sparkles, LogIn,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
 import { getAccessToken } from "@/lib/supabase-helpers";
-import {
-  ALL_MODEL_GROUPS, MODEL_SKILL_COMPAT, SKILL_LABELS,
-  getIncompatibleSkills, getFilteredModelGroups,
-} from "@/lib/models";
+import { GCLAW_MODELS, SKILL_LABELS, DEFAULT_MODEL, GUEST_DEFAULT_MODEL } from "@/lib/models";
 import {
   loadLocalConversations, saveLocalConversations, loadLocalMessages,
   saveLocalMessages, deleteLocalConversation, clearLocalChatData,
