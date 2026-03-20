@@ -7,166 +7,37 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const LOVABLE_AI_ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-const ZEPHEL_ENDPOINT = "https://nvfszndwhgtjlxtclowb.supabase.co/functions/v1/external-chat";
-const ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
 
-// ── API Router ──
+// ── Tier → Backend Model Routing ──
 
-type ApiProvider = "gemini" | "openai" | "zephel" | "anthropic";
+const TIER_MODEL_MAP: Record<string, string> = {
+  "gclaw/default": "google/gemini-3-flash-preview",
+  "gclaw/flash": "google/gemini-2.5-flash",
+  "gclaw/nano": "google/gemini-2.5-flash-lite",
+  "gclaw/thinking": "google/gemini-2.5-pro",
+};
 
-function getApiConfig(model: string): { url: string; apiKey: string; modelName: string; provider: ApiProvider } {
-  const geminiKey = Deno.env.get("GEMINI_API_KEY");
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  const zephelKey = Deno.env.get("ZEPHEL_API_KEY");
-  const claudeKey = Deno.env.get("CLAUDE_API_KEY");
+const TIER_SYSTEM_PROMPTS: Record<string, string> = {
+  "gclaw/default": `You are gClaw, an enterprise AI assistant built on the OpenClaw agent orchestration protocol. You are helpful, knowledgeable, and conversational. Provide balanced, well-structured responses. Format responses with markdown when appropriate. Use fenced code blocks with language identifiers for code.`,
+  "gclaw/flash": `You are gClaw Flash, an enterprise AI assistant optimized for speed and efficiency. Be concise and direct. Minimize prose — get straight to the answer. Use bullet points and short paragraphs. Format with markdown. Use fenced code blocks for code.`,
+  "gclaw/nano": `You are gClaw Nano, a lightweight AI assistant for instant answers. Be ultra-brief. One-paragraph answers preferred. Skip pleasantries. Use markdown for code only. Maximum efficiency.`,
+  "gclaw/thinking": `You are gClaw Thinking, an enterprise AI assistant specializing in deep reasoning and analysis. Think step-by-step. Show your reasoning process. Be thorough and analytical. Consider edge cases. Provide comprehensive, well-structured responses with markdown formatting. Use fenced code blocks with language identifiers for code.`,
+};
 
-  if (model.startsWith("anthropic/")) {
-    if (!claudeKey) throw new Error("CLAUDE_API_KEY is not configured");
-    return { url: ANTHROPIC_ENDPOINT, apiKey: claudeKey, modelName: model.replace("anthropic/", ""), provider: "anthropic" };
-  }
-  if (model.startsWith("zephel/")) {
-    if (!zephelKey) throw new Error("ZEPHEL_API_KEY is not configured");
-    return { url: ZEPHEL_ENDPOINT, apiKey: zephelKey, modelName: model.replace("zephel/", ""), provider: "zephel" };
-  }
-  if (model.startsWith("openai/")) {
-    if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-    return { url: OPENAI_ENDPOINT, apiKey: openaiKey, modelName: model.replace("openai/", ""), provider: "openai" };
-  }
-  // Default to Gemini for google/* and any other model
-  if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured");
-  return { url: GEMINI_ENDPOINT, apiKey: geminiKey, modelName: model.replace("google/", ""), provider: "gemini" };
+function resolveModel(tier: string): string {
+  return TIER_MODEL_MAP[tier] || TIER_MODEL_MAP["gclaw/default"];
 }
 
-// ── Anthropic adapter ──
-
-function convertToAnthropicMessages(messages: any[]): { system: string; messages: any[] } {
-  let system = "";
-  const anthropicMessages: any[] = [];
-
-  for (const msg of messages) {
-    if (msg.role === "system") {
-      system += (system ? "\n\n" : "") + msg.content;
-    } else if (msg.role === "tool") {
-      anthropicMessages.push({
-        role: "user",
-        content: [{
-          type: "tool_result",
-          tool_use_id: msg.tool_call_id,
-          content: msg.content,
-        }],
-      });
-    } else if (msg.role === "assistant" && msg.tool_calls) {
-      const content: any[] = [];
-      if (msg.content) content.push({ type: "text", text: msg.content });
-      for (const tc of msg.tool_calls) {
-        content.push({
-          type: "tool_use",
-          id: tc.id,
-          name: tc.function.name,
-          input: JSON.parse(tc.function.arguments || "{}"),
-        });
-      }
-      anthropicMessages.push({ role: "assistant", content });
-    } else {
-      anthropicMessages.push({ role: msg.role, content: msg.content });
-    }
-  }
-
-  return { system, messages: anthropicMessages };
+function getSystemPrompt(tier: string): string {
+  return TIER_SYSTEM_PROMPTS[tier] || TIER_SYSTEM_PROMPTS["gclaw/default"];
 }
 
-function convertToolsToAnthropic(tools: any[]): any[] {
-  return tools.map((t) => ({
-    name: t.function.name,
-    description: t.function.description,
-    input_schema: t.function.parameters,
-  }));
-}
-
-function anthropicStreamToOpenAI(anthropicBody: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-
-  return new ReadableStream({
-    async start(controller) {
-      const reader = anthropicBody.getReader();
-      let buffer = "";
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let newlineIndex: number;
-          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, newlineIndex).trim();
-            buffer = buffer.slice(newlineIndex + 1);
-
-            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
-
-            try {
-              const event = JSON.parse(line.slice(6));
-              let content = "";
-
-              if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
-                content = event.delta.text || "";
-              } else if (event.type === "message_stop") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                continue;
-              }
-
-              if (content) {
-                const openaiChunk = { choices: [{ delta: { content } }] };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
-              }
-            } catch {
-              // skip unparseable lines
-            }
-          }
-        }
-        // Send DONE if not already sent
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      } finally {
-        controller.close();
-      }
-    },
-  });
-}
-
-function parseAnthropicToolCalls(data: any): { content: string; tool_calls: any[] } | null {
-  if (!data?.content) return null;
-
-  let textContent = "";
-  const toolCalls: any[] = [];
-
-  for (const block of data.content) {
-    if (block.type === "text") {
-      textContent += block.text;
-    } else if (block.type === "tool_use") {
-      try {
-        toolCalls.push({
-          id: block.id,
-          type: "function",
-          function: {
-            name: block.name,
-            arguments: typeof block.input === "string" ? block.input : JSON.stringify(block.input ?? {}),
-          },
-        });
-      } catch (e) {
-        console.error("Malformed tool_use block, skipping:", block, e);
-      }
-    }
-  }
-
-  return {
-    content: textContent,
-    tool_calls: toolCalls.length > 0 ? toolCalls : undefined as any,
-  };
+function validateTier(tier: string): string {
+  return TIER_MODEL_MAP[tier] ? tier : "gclaw/default";
 }
 
 // ── Tool definitions ──
@@ -291,14 +162,14 @@ async function executeWebSearch(query: string): Promise<string> {
 }
 
 async function executeImageGeneration(prompt: string): Promise<string> {
-  const geminiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!geminiKey) return "Image generation failed: GEMINI_API_KEY is not configured.";
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return "Image generation failed: LOVABLE_API_KEY is not configured.";
   try {
-    const response = await fetch(GEMINI_ENDPOINT, {
+    const response = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${geminiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gemini-3.1-flash-image-preview",
+        model: "google/gemini-3.1-flash-image-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
@@ -323,19 +194,19 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) return "Knowledge search failed: GEMINI_API_KEY is not configured.";
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey) return "Knowledge search failed: LOVABLE_API_KEY is not configured.";
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const embResponse = await fetch(GEMINI_ENDPOINT, {
+    const embResponse = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${geminiKey}`,
+        Authorization: `Bearer ${lovableKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
@@ -499,120 +370,11 @@ function validateAndSanitize(messages: any[]): any[] {
   });
 }
 
-function validateModel(model: string): string {
-  const ALLOWED_MODELS = [
-    "google/gemini-3-flash-preview",
-    "google/gemini-2.5-flash",
-    "google/gemini-2.5-pro",
-    "google/gemini-2.5-flash-lite",
-    "google/gemini-3.1-pro-preview",
-    "openai/gpt-5-mini",
-    "openai/gpt-5",
-    "openai/gpt-5-nano",
-    "openai/gpt-5.2",
-    "zephel/zephel",
-    "zephel/zephel-pro",
-    "zephel/zephel-fast",
-    "anthropic/claude-sonnet-4",
-    "anthropic/claude-opus-4",
-    "anthropic/claude-haiku-3.5",
-  ];
-  return ALLOWED_MODELS.includes(model) ? model : "google/gemini-3-flash-preview";
-}
-
 function errorResponse(status: number, message: string) {
   return new Response(
     JSON.stringify({ error: message }),
     { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
-}
-
-// ── Anthropic request helpers ──
-
-async function anthropicStreamingRequest(
-  apiKey: string,
-  modelName: string,
-  fullMessages: any[],
-): Promise<Response> {
-  const { system, messages } = convertToAnthropicMessages(fullMessages);
-  const body: any = {
-    model: modelName,
-    max_tokens: 4096,
-    stream: true,
-    messages,
-  };
-  if (system) body.system = system;
-
-  const response = await fetch(ANTHROPIC_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const status = response.status;
-    const t = await response.text();
-    console.error("Anthropic API error:", status, t);
-    return errorResponse(
-      status,
-      status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
-    );
-  }
-
-  const openaiStream = anthropicStreamToOpenAI(response.body!);
-  return new Response(openaiStream, {
-    headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-  });
-}
-
-async function anthropicToolRequest(
-  apiKey: string,
-  modelName: string,
-  fullMessages: any[],
-  tools: any[],
-): Promise<any> {
-  const { system, messages } = convertToAnthropicMessages(fullMessages);
-  const body: any = {
-    model: modelName,
-    max_tokens: 4096,
-    messages,
-    tools: convertToolsToAnthropic(tools),
-  };
-  if (system) body.system = system;
-
-  const response = await fetch(ANTHROPIC_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const status = response.status;
-    const t = await response.text();
-    console.error("Anthropic API error:", status, t);
-    throw { status, message: status === 429 ? "Rate limit exceeded. Please wait a moment." : "AI error" };
-  }
-
-  const data = await response.json();
-  const parsed = parseAnthropicToolCalls(data);
-  
-  // Return in OpenAI-compatible format
-  return {
-    choices: [{
-      message: {
-        content: parsed?.content || "",
-        tool_calls: parsed?.tool_calls,
-      },
-    }],
-  };
 }
 
 // ── Main handler ──
@@ -623,7 +385,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
 
-    // Extract user ID for knowledge base search
+    // Extract user ID
     let userId: string | null = null;
     const authHeader = req.headers.get("Authorization");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -639,7 +401,8 @@ serve(async (req) => {
     }
 
     const messages = validateAndSanitize(body.messages);
-    const selectedModel = validateModel(body.model || "google/gemini-3-flash-preview");
+    const selectedTier = validateTier(body.model || "gclaw/default");
+    const backendModel = resolveModel(selectedTier);
 
     // ── Model access enforcement ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -649,7 +412,7 @@ serve(async (req) => {
     const { data: modelDefault } = await accessClient
       .from("model_access_defaults")
       .select("enabled, visitor_enabled")
-      .eq("model", selectedModel)
+      .eq("model", selectedTier)
       .single();
 
     if (modelDefault) {
@@ -658,7 +421,7 @@ serve(async (req) => {
           .from("user_model_overrides")
           .select("enabled")
           .eq("user_id", userId)
-          .eq("model", selectedModel)
+          .eq("model", selectedTier)
           .single();
 
         const allowed = override ? override.enabled : modelDefault.enabled;
@@ -671,8 +434,12 @@ serve(async (req) => {
         }
       }
     }
+
     const enabledSkills: string[] = Array.isArray(body.skills) ? body.skills : [];
-    const { url: apiUrl, apiKey, modelName, provider } = getApiConfig(selectedModel);
+    
+    // All tiers use Lovable AI gateway
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // Build tools array
     const tools: any[] = [];
@@ -692,7 +459,8 @@ serve(async (req) => {
       }
     }
 
-    const systemPrompt = `You are gClaw, an enterprise AI assistant built on the OpenClaw agent orchestration protocol. You are helpful, knowledgeable, and concise. Format responses with markdown when appropriate. Use fenced code blocks with language identifiers for code.
+    const basePrompt = getSystemPrompt(selectedTier);
+    const systemPrompt = `${basePrompt}
 
 ${tools.length > 0 ? "You have access to tools/skills. Use them when they would help answer the user's question." : ""}
 ${enabledSkills.includes("memory") ? "\nYou can remember user preferences across sessions. Proactively store important user context (name, preferences, projects, etc.) using store_memory. Use recall_memory at the start to personalize." : ""}
@@ -704,14 +472,10 @@ When you use a tool and get results, synthesize the information into a helpful r
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
-      if (provider === "anthropic") {
-        return await anthropicStreamingRequest(apiKey, modelName, fullMessages);
-      }
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch(LOVABLE_AI_ENDPOINT, {
         method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: modelName, messages: fullMessages, stream: true }),
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: backendModel, messages: fullMessages, stream: true }),
       });
 
       if (!response.ok) {
@@ -720,7 +484,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         console.error("API error:", status, t);
         return errorResponse(
           status,
-          status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
+          status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required. Please add credits." : "AI error"
         );
       }
 
@@ -730,68 +494,59 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // ── With tools: non-streaming first ──
+    const initialResponse = await fetch(LOVABLE_AI_ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: backendModel, messages: fullMessages, tools, tool_choice: "auto" }),
+    });
+
+    if (!initialResponse.ok) {
+      const status = initialResponse.status;
+      const t = await initialResponse.text();
+      console.error("API error:", status, t);
+      return errorResponse(
+        status,
+        status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required. Please add credits." : "AI error"
+      );
+    }
+
     let initialData: any;
-
-    if (provider === "anthropic") {
-      try {
-        initialData = await anthropicToolRequest(apiKey, modelName, fullMessages, tools);
-      } catch (err: any) {
-        return errorResponse(err.status || 500, err.message || "AI error");
-      }
-    } else {
-      const initialResponse = await fetch(apiUrl, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: modelName, messages: fullMessages, tools, tool_choice: "auto" }),
-      });
-
-      if (!initialResponse.ok) {
-        const status = initialResponse.status;
-        const t = await initialResponse.text();
-        console.error("API error:", status, t);
-        return errorResponse(
-          status,
-          status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
-        );
-      }
-
-      const initialText = await initialResponse.text();
-      try {
-        if (initialText.startsWith("data: ") || initialText.startsWith(":")) {
-          const lines = initialText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
-          const chunks = lines.map(l => {
-            try { return JSON.parse(l.slice(6)); } catch { return null; }
-          }).filter(Boolean);
-          if (chunks.length > 0) {
-            const combinedContent = chunks
-              .map((c: any) => c.choices?.[0]?.delta?.content || c.choices?.[0]?.message?.content || "")
-              .join("");
-            const toolCalls = chunks
-              .map((c: any) => c.choices?.[0]?.delta?.tool_calls || c.choices?.[0]?.message?.tool_calls)
-              .filter(Boolean)
-              .flat();
-            initialData = {
-              choices: [{
-                message: {
-                  content: combinedContent,
-                  tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-                },
-              }],
-            };
-          } else {
-            throw new Error("No parseable data in SSE response");
-          }
+    const initialText = await initialResponse.text();
+    try {
+      if (initialText.startsWith("data: ") || initialText.startsWith(":")) {
+        const lines = initialText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
+        const chunks = lines.map(l => {
+          try { return JSON.parse(l.slice(6)); } catch { return null; }
+        }).filter(Boolean);
+        if (chunks.length > 0) {
+          const combinedContent = chunks
+            .map((c: any) => c.choices?.[0]?.delta?.content || c.choices?.[0]?.message?.content || "")
+            .join("");
+          const toolCalls = chunks
+            .map((c: any) => c.choices?.[0]?.delta?.tool_calls || c.choices?.[0]?.message?.tool_calls)
+            .filter(Boolean)
+            .flat();
+          initialData = {
+            choices: [{
+              message: {
+                content: combinedContent,
+                tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+              },
+            }],
+          };
         } else {
-          initialData = JSON.parse(initialText);
+          throw new Error("No parseable data in SSE response");
         }
-      } catch (parseErr) {
-        console.error("Failed to parse API response:", initialText.slice(0, 200));
-        const fallbackContent = initialText.replace(/^data:\s*/gm, "").replace(/\[DONE\]/g, "").trim();
-        const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackContent || "Sorry, I encountered an error processing the response." } }] })}\n\ndata: [DONE]\n\n`;
-        return new Response(sseData, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
+      } else {
+        initialData = JSON.parse(initialText);
       }
+    } catch (parseErr) {
+      console.error("Failed to parse API response:", initialText.slice(0, 200));
+      const fallbackContent = initialText.replace(/^data:\s*/gm, "").replace(/\[DONE\]/g, "").trim();
+      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackContent || "Sorry, I encountered an error processing the response." } }] })}\n\ndata: [DONE]\n\n`;
+      return new Response(sseData, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
     }
 
     const choice = initialData.choices?.[0];
@@ -848,35 +603,10 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // Stream final response with tool results
-    if (provider === "anthropic") {
-      const finalResp = await anthropicStreamingRequest(apiKey, modelName, toolMessages);
-      // Prepend tool status chunks
-      const encoder = new TextEncoder();
-      const statusData = toolStatusChunks.join("");
-      const combinedStream = new ReadableStream({
-        async start(controller) {
-          controller.enqueue(encoder.encode(statusData));
-          const reader = finalResp.body!.getReader();
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              controller.enqueue(value);
-            }
-          } finally {
-            controller.close();
-          }
-        },
-      });
-      return new Response(combinedStream, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
-    }
-
-    const finalResponse = await fetch(apiUrl, {
+    const finalResponse = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: modelName, messages: toolMessages, stream: true }),
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: backendModel, messages: toolMessages, stream: true }),
     });
 
     if (!finalResponse.ok) {

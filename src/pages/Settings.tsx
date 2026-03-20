@@ -17,7 +17,7 @@ const Settings = () => {
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [defaultModel, setDefaultModel] = useState("google/gemini-3-flash-preview");
+  const [defaultModel, setDefaultModel] = useState("gclaw/default");
   const [ttsVoiceId, setTtsVoiceId] = useState("JBFqnCBsd6RMkjVDRZzb");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);

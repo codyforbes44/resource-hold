@@ -5,22 +5,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import {
-  Mic, PanelLeft, Sparkles, AlertTriangle, LogIn,
+  Mic, PanelLeft, Sparkles, LogIn,
 } from "lucide-react";
 import SkillsPanel, { DEFAULT_SKILLS, type Skill } from "@/components/chat/SkillsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { messageSchema } from "@/lib/validations";
 import { getAccessToken } from "@/lib/supabase-helpers";
-import {
-  ALL_MODEL_GROUPS, MODEL_SKILL_COMPAT, SKILL_LABELS,
-  getIncompatibleSkills, getFilteredModelGroups,
-} from "@/lib/models";
+import { GCLAW_MODELS, SKILL_LABELS, DEFAULT_MODEL, GUEST_DEFAULT_MODEL } from "@/lib/models";
 import {
   loadLocalConversations, saveLocalConversations, loadLocalMessages,
   saveLocalMessages, deleteLocalConversation, clearLocalChatData,
@@ -48,7 +45,7 @@ const Chat = () => {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState(isGuest ? "zephel/zephel-fast" : ALL_MODEL_GROUPS[0].models[0].value);
+  const [model, setModel] = useState(isGuest ? GUEST_DEFAULT_MODEL : DEFAULT_MODEL);
   const [allowedModels, setAllowedModels] = useState<string[] | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
@@ -106,20 +103,7 @@ const Chat = () => {
 
   useEffect(() => { if (isMobile) setSidebarOpen(false); }, [isMobile]);
 
-  // Auto-switch model if incompatible with active skills
-  useEffect(() => {
-    const active = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
-    if (active.length === 0) return;
-    const incompatible = getIncompatibleSkills(model, active);
-    if (incompatible.length > 0) {
-      const allAllowed = ALL_MODEL_GROUPS.flatMap((g) => g.models).filter((m) => !allowedModels || allowedModels.includes(m.value));
-      const first = allAllowed.find((m) => getIncompatibleSkills(m.value, active).length === 0);
-      if (first) {
-        setModel(first.value);
-        toast.info(`Switched to ${first.label} — ${incompatible.map((s) => SKILL_LABELS[s] || s).join(", ")} not supported by previous model`);
-      }
-    }
-  }, [skills, allowedModels]);
+  // No auto-switch needed — all tiers support all skills
 
   // Load conversations
   useEffect(() => {
@@ -409,8 +393,7 @@ const Chat = () => {
     );
 
   const activeSkillCount = skills.filter((s) => s.enabled).length;
-  const activeSkillsForCompat = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
-  const MODEL_GROUPS = getFilteredModelGroups(allowedModels, activeSkillsForCompat);
+  const filteredModels = allowedModels ? GCLAW_MODELS.filter((m) => allowedModels.includes(m.value)) : GCLAW_MODELS;
 
   return (
     <div className="flex h-[100dvh] bg-background">
@@ -448,25 +431,13 @@ const Chat = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MODEL_GROUPS.map((group) => (
-                <SelectGroup key={group.label}>
-                  <SelectLabel>{group.label}</SelectLabel>
-                  {group.models.map((m) => (
-                    <SelectItem key={m.value} value={m.value} disabled={m.isDisabled} className={m.isDisabled ? "opacity-40 cursor-not-allowed" : ""}
-                      title={m.isDisabled ? `Not compatible with: ${m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}` : undefined}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {m.label}
-                        {m.isDisabled && (
-                          <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-                            <AlertTriangle className="h-3 w-3" />
-                            {m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
+              {filteredModels.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  <span className="flex flex-col">
+                    <span>{m.label}</span>
+                    <span className="text-[10px] text-muted-foreground hidden md:inline">{m.description}</span>
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
