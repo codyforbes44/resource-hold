@@ -32,6 +32,14 @@ const MODEL_GROUPS = [
       { value: "zephel/zephel-fast", label: "Zephel Fast" },
     ],
   },
+  {
+    label: "Anthropic",
+    models: [
+      { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4" },
+      { value: "anthropic/claude-opus-4", label: "Claude Opus 4" },
+      { value: "anthropic/claude-haiku-3.5", label: "Claude Haiku 3.5" },
+    ],
+  },
 ];
 
 const TTS_VOICES = [

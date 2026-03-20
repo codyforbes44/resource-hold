@@ -10,27 +10,159 @@ const corsHeaders = {
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const ZEPHEL_ENDPOINT = "https://nvfszndwhgtjlxtclowb.supabase.co/functions/v1/external-chat";
+const ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
 
 // ── API Router ──
 
-function getApiConfig(model: string): { url: string; apiKey: string; modelName: string } {
+type ApiProvider = "gemini" | "openai" | "zephel" | "anthropic";
+
+function getApiConfig(model: string): { url: string; apiKey: string; modelName: string; provider: ApiProvider } {
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   const zephelKey = Deno.env.get("ZEPHEL_API_KEY");
+  const claudeKey = Deno.env.get("CLAUDE_API_KEY");
 
+  if (model.startsWith("anthropic/")) {
+    if (!claudeKey) throw new Error("CLAUDE_API_KEY is not configured");
+    return { url: ANTHROPIC_ENDPOINT, apiKey: claudeKey, modelName: model.replace("anthropic/", ""), provider: "anthropic" };
+  }
   if (model.startsWith("zephel/")) {
     if (!zephelKey) throw new Error("ZEPHEL_API_KEY is not configured");
-    return { url: ZEPHEL_ENDPOINT, apiKey: zephelKey, modelName: model.replace("zephel/", "") };
+    return { url: ZEPHEL_ENDPOINT, apiKey: zephelKey, modelName: model.replace("zephel/", ""), provider: "zephel" };
   }
   if (model.startsWith("openai/")) {
     if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-    return { url: OPENAI_ENDPOINT, apiKey: openaiKey, modelName: model.replace("openai/", "") };
+    return { url: OPENAI_ENDPOINT, apiKey: openaiKey, modelName: model.replace("openai/", ""), provider: "openai" };
   }
   // Default to Gemini for google/* and any other model
   if (!geminiKey) throw new Error("GEMINI_API_KEY is not configured");
-  return { url: GEMINI_ENDPOINT, apiKey: geminiKey, modelName: model.replace("google/", "") };
+  return { url: GEMINI_ENDPOINT, apiKey: geminiKey, modelName: model.replace("google/", ""), provider: "gemini" };
+}
+
+// ── Anthropic adapter ──
+
+function convertToAnthropicMessages(messages: any[]): { system: string; messages: any[] } {
+  let system = "";
+  const anthropicMessages: any[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === "system") {
+      system += (system ? "\n\n" : "") + msg.content;
+    } else if (msg.role === "tool") {
+      anthropicMessages.push({
+        role: "user",
+        content: [{
+          type: "tool_result",
+          tool_use_id: msg.tool_call_id,
+          content: msg.content,
+        }],
+      });
+    } else if (msg.role === "assistant" && msg.tool_calls) {
+      const content: any[] = [];
+      if (msg.content) content.push({ type: "text", text: msg.content });
+      for (const tc of msg.tool_calls) {
+        content.push({
+          type: "tool_use",
+          id: tc.id,
+          name: tc.function.name,
+          input: JSON.parse(tc.function.arguments || "{}"),
+        });
+      }
+      anthropicMessages.push({ role: "assistant", content });
+    } else {
+      anthropicMessages.push({ role: msg.role, content: msg.content });
+    }
+  }
+
+  return { system, messages: anthropicMessages };
+}
+
+function convertToolsToAnthropic(tools: any[]): any[] {
+  return tools.map((t) => ({
+    name: t.function.name,
+    description: t.function.description,
+    input_schema: t.function.parameters,
+  }));
+}
+
+function anthropicStreamToOpenAI(anthropicBody: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = anthropicBody.getReader();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+
+            try {
+              const event = JSON.parse(line.slice(6));
+              let content = "";
+
+              if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+                content = event.delta.text || "";
+              } else if (event.type === "message_stop") {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                continue;
+              }
+
+              if (content) {
+                const openaiChunk = { choices: [{ delta: { content } }] };
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+              }
+            } catch {
+              // skip unparseable lines
+            }
+          }
+        }
+        // Send DONE if not already sent
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+}
+
+function parseAnthropicToolCalls(data: any): { content: string; tool_calls: any[] } | null {
+  if (!data?.content) return null;
+
+  let textContent = "";
+  const toolCalls: any[] = [];
+
+  for (const block of data.content) {
+    if (block.type === "text") {
+      textContent += block.text;
+    } else if (block.type === "tool_use") {
+      toolCalls.push({
+        id: block.id,
+        type: "function",
+        function: {
+          name: block.name,
+          arguments: JSON.stringify(block.input),
+        },
+      });
+    }
+  }
+
+  return {
+    content: textContent,
+    tool_calls: toolCalls.length > 0 ? toolCalls : undefined as any,
+  };
 }
 
 // ── Tool definitions ──
@@ -155,7 +287,6 @@ async function executeWebSearch(query: string): Promise<string> {
 }
 
 async function executeImageGeneration(prompt: string): Promise<string> {
-  // Image generation uses Gemini's image model directly
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (!geminiKey) return "Image generation failed: GEMINI_API_KEY is not configured.";
   try {
@@ -193,7 +324,6 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Generate embedding using Gemini directly
     const embResponse = await fetch(GEMINI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -379,6 +509,9 @@ function validateModel(model: string): string {
     "zephel/zephel",
     "zephel/zephel-pro",
     "zephel/zephel-fast",
+    "anthropic/claude-sonnet-4",
+    "anthropic/claude-opus-4",
+    "anthropic/claude-haiku-3.5",
   ];
   return ALLOWED_MODELS.includes(model) ? model : "google/gemini-3-flash-preview";
 }
@@ -388,6 +521,94 @@ function errorResponse(status: number, message: string) {
     JSON.stringify({ error: message }),
     { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
+}
+
+// ── Anthropic request helpers ──
+
+async function anthropicStreamingRequest(
+  apiKey: string,
+  modelName: string,
+  fullMessages: any[],
+): Promise<Response> {
+  const { system, messages } = convertToAnthropicMessages(fullMessages);
+  const body: any = {
+    model: modelName,
+    max_tokens: 4096,
+    stream: true,
+    messages,
+  };
+  if (system) body.system = system;
+
+  const response = await fetch(ANTHROPIC_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const status = response.status;
+    const t = await response.text();
+    console.error("Anthropic API error:", status, t);
+    return errorResponse(
+      status,
+      status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
+    );
+  }
+
+  const openaiStream = anthropicStreamToOpenAI(response.body!);
+  return new Response(openaiStream, {
+    headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+  });
+}
+
+async function anthropicToolRequest(
+  apiKey: string,
+  modelName: string,
+  fullMessages: any[],
+  tools: any[],
+): Promise<any> {
+  const { system, messages } = convertToAnthropicMessages(fullMessages);
+  const body: any = {
+    model: modelName,
+    max_tokens: 4096,
+    messages,
+    tools: convertToolsToAnthropic(tools),
+  };
+  if (system) body.system = system;
+
+  const response = await fetch(ANTHROPIC_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const status = response.status;
+    const t = await response.text();
+    console.error("Anthropic API error:", status, t);
+    throw { status, message: status === 429 ? "Rate limit exceeded. Please wait a moment." : "AI error" };
+  }
+
+  const data = await response.json();
+  const parsed = parseAnthropicToolCalls(data);
+  
+  // Return in OpenAI-compatible format
+  return {
+    choices: [{
+      message: {
+        content: parsed?.content || "",
+        tool_calls: parsed?.tool_calls,
+      },
+    }],
+  };
 }
 
 // ── Main handler ──
@@ -402,7 +623,6 @@ serve(async (req) => {
     let userId: string | null = null;
     const authHeader = req.headers.get("Authorization");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    // Skip the expensive getUser() call when the token is just the anon key (guest/visitor)
     if (authHeader && !authHeader.endsWith(anonKey)) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -430,7 +650,6 @@ serve(async (req) => {
 
     if (modelDefault) {
       if (userId) {
-        // Check user-specific override first
         const { data: override } = await accessClient
           .from("user_model_overrides")
           .select("enabled")
@@ -443,21 +662,19 @@ serve(async (req) => {
           return errorResponse(403, "This model is not available for your account. Contact an administrator.");
         }
       } else {
-        // Visitor
         if (!modelDefault.visitor_enabled) {
           return errorResponse(403, "This model requires authentication. Please sign in.");
         }
       }
     }
     const enabledSkills: string[] = Array.isArray(body.skills) ? body.skills : [];
-    const { url: apiUrl, apiKey, modelName } = getApiConfig(selectedModel);
+    const { url: apiUrl, apiKey, modelName, provider } = getApiConfig(selectedModel);
 
     // Build tools array
     const tools: any[] = [];
     for (const skillId of enabledSkills) {
       if (SKILL_TOOLS[skillId]) tools.push(SKILL_TOOLS[skillId]);
     }
-    // Memory skill adds both store and recall tools
     if (enabledSkills.includes("memory") && SKILL_TOOLS["memory_recall"]) {
       tools.push(SKILL_TOOLS["memory_recall"]);
     }
@@ -483,6 +700,10 @@ When you use a tool and get results, synthesize the information into a helpful r
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
+      if (provider === "anthropic") {
+        return await anthropicStreamingRequest(apiKey, modelName, fullMessages);
+      }
+
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -505,63 +726,70 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // ── With tools: non-streaming first ──
-    const initialResponse = await fetch(apiUrl, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: modelName, messages: fullMessages, tools, tool_choice: "auto" }),
-    });
-
-    if (!initialResponse.ok) {
-      const status = initialResponse.status;
-      const t = await initialResponse.text();
-      console.error("API error:", status, t);
-      return errorResponse(
-        status,
-        status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
-      );
-    }
-
-    const initialText = await initialResponse.text();
     let initialData: any;
-    try {
-      // Handle SSE-formatted responses (some providers return SSE even for non-streaming requests)
-      if (initialText.startsWith("data: ") || initialText.startsWith(":")) {
-        const lines = initialText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
-        const chunks = lines.map(l => {
-          try { return JSON.parse(l.slice(6)); } catch { return null; }
-        }).filter(Boolean);
-        // Combine SSE chunks into a single response
-        if (chunks.length > 0) {
-          const combinedContent = chunks
-            .map((c: any) => c.choices?.[0]?.delta?.content || c.choices?.[0]?.message?.content || "")
-            .join("");
-          const toolCalls = chunks
-            .map((c: any) => c.choices?.[0]?.delta?.tool_calls || c.choices?.[0]?.message?.tool_calls)
-            .filter(Boolean)
-            .flat();
-          initialData = {
-            choices: [{
-              message: {
-                content: combinedContent,
-                tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-              },
-            }],
-          };
-        } else {
-          throw new Error("No parseable data in SSE response");
-        }
-      } else {
-        initialData = JSON.parse(initialText);
+
+    if (provider === "anthropic") {
+      try {
+        initialData = await anthropicToolRequest(apiKey, modelName, fullMessages, tools);
+      } catch (err: any) {
+        return errorResponse(err.status || 500, err.message || "AI error");
       }
-    } catch (parseErr) {
-      console.error("Failed to parse API response:", initialText.slice(0, 200));
-      // Fall back: return the raw text as assistant content
-      const fallbackContent = initialText.replace(/^data:\s*/gm, "").replace(/\[DONE\]/g, "").trim();
-      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackContent || "Sorry, I encountered an error processing the response." } }] })}\n\ndata: [DONE]\n\n`;
-      return new Response(sseData, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    } else {
+      const initialResponse = await fetch(apiUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: modelName, messages: fullMessages, tools, tool_choice: "auto" }),
       });
+
+      if (!initialResponse.ok) {
+        const status = initialResponse.status;
+        const t = await initialResponse.text();
+        console.error("API error:", status, t);
+        return errorResponse(
+          status,
+          status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required" : "AI error"
+        );
+      }
+
+      const initialText = await initialResponse.text();
+      try {
+        if (initialText.startsWith("data: ") || initialText.startsWith(":")) {
+          const lines = initialText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
+          const chunks = lines.map(l => {
+            try { return JSON.parse(l.slice(6)); } catch { return null; }
+          }).filter(Boolean);
+          if (chunks.length > 0) {
+            const combinedContent = chunks
+              .map((c: any) => c.choices?.[0]?.delta?.content || c.choices?.[0]?.message?.content || "")
+              .join("");
+            const toolCalls = chunks
+              .map((c: any) => c.choices?.[0]?.delta?.tool_calls || c.choices?.[0]?.message?.tool_calls)
+              .filter(Boolean)
+              .flat();
+            initialData = {
+              choices: [{
+                message: {
+                  content: combinedContent,
+                  tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+                },
+              }],
+            };
+          } else {
+            throw new Error("No parseable data in SSE response");
+          }
+        } else {
+          initialData = JSON.parse(initialText);
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse API response:", initialText.slice(0, 200));
+        const fallbackContent = initialText.replace(/^data:\s*/gm, "").replace(/\[DONE\]/g, "").trim();
+        const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackContent || "Sorry, I encountered an error processing the response." } }] })}\n\ndata: [DONE]\n\n`;
+        return new Response(sseData, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
     }
+
     const choice = initialData.choices?.[0];
 
     if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
@@ -609,6 +837,31 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // Stream final response with tool results
+    if (provider === "anthropic") {
+      const finalResp = await anthropicStreamingRequest(apiKey, modelName, toolMessages);
+      // Prepend tool status chunks
+      const encoder = new TextEncoder();
+      const statusData = toolStatusChunks.join("");
+      const combinedStream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(encoder.encode(statusData));
+          const reader = finalResp.body!.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(combinedStream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
     const finalResponse = await fetch(apiUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
