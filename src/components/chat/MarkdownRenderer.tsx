@@ -302,8 +302,8 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
           },
         }}
       >
-        {content}
-      </ReactMarkdown>
+        {rest}
+      </ReactMarkdown>}
     </div>
   );
 };
