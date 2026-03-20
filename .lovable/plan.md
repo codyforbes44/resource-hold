@@ -1,29 +1,40 @@
 
 
-## Batch Ingest URLs into Knowledge Base
+## Refactor Chat Response Rendering for Best-in-Class UX
 
-### What
-Extract all 101 URLs from the provided list and ingest them into the knowledge base using the existing `knowledge-upload` edge function's `ingest_url` action.
+### Problem
+The MarkdownRenderer is minimal — it only handles code blocks and inline code. Missing support for: tables (GFM), task lists, links opening in new tabs, headings with proper sizing, blockquotes, horizontal rules, lists with proper spacing, and images. The `prose` Tailwind class provides some defaults but many markdown elements render poorly or inconsistently.
 
-### Approach
-Run a server-side script that calls the `knowledge-upload` edge function directly for each URL, using the service role key to bypass auth (since this is an admin action). The script will:
+### Changes
 
-1. Parse all URLs from the list
-2. Call the edge function sequentially with delays between requests (to avoid rate limiting on Firecrawl)
-3. Log success/failure for each URL
-4. Output a summary report
+#### 1. Install `remark-gfm` plugin
+Adds GitHub Flavored Markdown support: tables, strikethrough, task lists, autolinks.
 
-### Technical Details
+#### 2. Refactor `src/components/chat/MarkdownRenderer.tsx`
+- Add `remarkGfm` plugin to ReactMarkdown
+- Add custom components for:
+  - **Links (`a`)**: Open external links in new tab with `rel="noopener noreferrer"`, styled with primary color
+  - **Tables (`table`, `thead`, `th`, `td`)**: Styled with borders, alternating row colors, horizontal scroll wrapper for mobile
+  - **Blockquotes (`blockquote`)**: Left border accent, muted background
+  - **Lists (`ul`, `ol`, `li`)**: Proper spacing and bullet/number styling
+  - **Headings (`h1`-`h4`)**: Proper size hierarchy with bottom borders on h1/h2
+  - **Horizontal rules (`hr`)**: Styled divider
+  - **Images (`img`)**: Rounded, max-height constrained, clickable to open full-size
+  - **Task lists**: Checkbox rendering for `- [x]` / `- [ ]` syntax
+- Improve the prose wrapper classes for tighter dark/light mode consistency
 
-- **Edge function**: `knowledge-upload` with `action: "ingest_url"` — already implemented
-- **Dependency**: Firecrawl connector (already connected) for scraping each URL
-- **Auth**: Script will use `SUPABASE_SERVICE_ROLE_KEY` to authenticate, and will need a valid `user_id` to associate documents with
-- **Rate limiting**: ~2-3 second delay between URLs to respect Firecrawl limits
-- **Total URLs**: ~101 URLs across 15 categories
+#### 3. Update system prompts in `supabase/functions/chat/index.ts`
+Enhance `TIER_SYSTEM_PROMPTS` to instruct models to:
+- Use markdown formatting consistently (headers, bold, lists, tables where appropriate)
+- Structure long responses with clear sections
+- Use tables for comparisons and structured data
+- Use code blocks with language identifiers
+- Use blockquotes for citations/quotes
 
-### Important Consideration
-Before running, you'll need to confirm which user account these knowledge base documents should be associated with (the script needs a `user_id`). The URLs will be scraped, chunked, and embedded — this will take significant time (~5-10 minutes for 101 URLs) and consume Firecrawl credits.
+This ensures models produce well-formatted output that the improved renderer can display properly.
 
-### Output
-A summary report listing each URL with its status (success/error) and chunk count, saved to `/mnt/documents/`.
+### Files to Change
+- `src/components/chat/MarkdownRenderer.tsx` — Full refactor with GFM + custom components
+- `supabase/functions/chat/index.ts` — Enhanced system prompts (lines 24-28)
+- `package.json` — Add `remark-gfm` dependency
 
