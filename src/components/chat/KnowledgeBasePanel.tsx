@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -13,6 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
   BookOpen,
+  Globe,
+  RefreshCw,
+  Link,
 } from "lucide-react";
 
 type KnowledgeDoc = {
@@ -23,6 +27,7 @@ type KnowledgeDoc = {
   chunk_count: number;
   error_message: string | null;
   created_at: string;
+  source_url?: string | null;
 };
 
 const ACCEPTED_TYPES = [
@@ -31,9 +36,10 @@ const ACCEPTED_TYPES = [
   "text/csv",
   "text/html",
   "application/json",
+  "application/pdf",
 ];
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 interface KnowledgeBasePanelProps {
   enabled: boolean;
@@ -44,6 +50,9 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
   const [documents, setDocuments] = useState<KnowledgeDoc[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [urlInput, setUrlInput] = useState("");
+  const [addingUrl, setAddingUrl] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -51,12 +60,37 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
     loadDocuments();
   }, [user, enabled]);
 
+  const getToken = async () => {
+    const session = await supabase.auth.getSession();
+    return session.data.session?.access_token;
+  };
+
+  const callEdgeFunction = async (body: Record<string, unknown>) => {
+    const token = await getToken();
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/knowledge-upload`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || "Request failed");
+    }
+    return resp.json();
+  };
+
   const loadDocuments = async () => {
     if (!user) return;
     setLoading(true);
     const { data } = await supabase
       .from("knowledge_documents")
-      .select("id, filename, file_size, status, chunk_count, error_message, created_at")
+      .select("id, filename, file_size, status, chunk_count, error_message, created_at, source_url")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     setDocuments((data as KnowledgeDoc[]) || []);
@@ -68,12 +102,18 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
     const file = e.target.files[0];
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error("File must be under 5MB");
+      toast.error("File must be under 10MB");
       return;
     }
 
-    if (!ACCEPTED_TYPES.includes(file.type) && !file.name.endsWith(".md") && !file.name.endsWith(".txt")) {
-      toast.error("Supported formats: .txt, .md, .csv, .html, .json");
+    const isAccepted =
+      ACCEPTED_TYPES.includes(file.type) ||
+      file.name.endsWith(".md") ||
+      file.name.endsWith(".txt") ||
+      file.name.endsWith(".pdf");
+
+    if (!isAccepted) {
+      toast.error("Supported formats: .txt, .md, .csv, .html, .json, .pdf");
       return;
     }
 
@@ -81,14 +121,12 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
     try {
       const filePath = `${user.id}/${Date.now()}-${file.name}`;
 
-      // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from("knowledge_documents")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Create document record
       const { data: doc, error: insertError } = await supabase
         .from("knowledge_documents")
         .insert({
@@ -107,28 +145,7 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
       toast.success(`"${file.name}" uploaded — processing...`);
       setDocuments((prev) => [doc as KnowledgeDoc, ...prev]);
 
-      // Trigger processing via edge function
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/knowledge-upload`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ action: "process", document_id: doc.id }),
-        }
-      );
-
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || "Processing failed");
-      }
-
-      const result = await resp.json();
+      const result = await callEdgeFunction({ action: "process", document_id: doc.id });
       toast.success(`"${file.name}" indexed — ${result.chunk_count} chunks created`);
       loadDocuments();
     } catch (err: any) {
@@ -141,30 +158,55 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
     }
   };
 
+  const handleAddUrl = async () => {
+    if (!user || !urlInput.trim()) return;
+
+    let url = urlInput.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = `https://${url}`;
+    }
+
+    setAddingUrl(true);
+    try {
+      const result = await callEdgeFunction({ action: "ingest_url", url });
+      toast.success(`URL indexed — ${result.chunk_count} chunks created`);
+      setUrlInput("");
+      setShowUrlInput(false);
+      loadDocuments();
+    } catch (err: any) {
+      console.error("URL ingest error:", err);
+      toast.error(err.message || "Failed to ingest URL");
+      loadDocuments();
+    } finally {
+      setAddingUrl(false);
+    }
+  };
+
   const handleDelete = async (doc: KnowledgeDoc) => {
     if (!confirm(`Delete "${doc.filename}"? This will remove all indexed chunks.`)) return;
 
     try {
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/knowledge-upload`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ action: "delete", document_id: doc.id }),
-        }
-      );
-
-      if (!resp.ok) throw new Error("Delete failed");
+      await callEdgeFunction({ action: "delete", document_id: doc.id });
       toast.success(`"${doc.filename}" deleted`);
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
     } catch (err: any) {
       toast.error(err.message);
+    }
+  };
+
+  const handleRefresh = async (doc: KnowledgeDoc) => {
+    if (!doc.source_url) return;
+    toast.info(`Re-indexing "${doc.filename}"...`);
+
+    try {
+      // Delete old doc then re-ingest
+      await callEdgeFunction({ action: "delete", document_id: doc.id });
+      const result = await callEdgeFunction({ action: "ingest_url", url: doc.source_url });
+      toast.success(`Re-indexed — ${result.chunk_count} chunks`);
+      loadDocuments();
+    } catch (err: any) {
+      toast.error(err.message || "Refresh failed");
+      loadDocuments();
     }
   };
 
@@ -200,28 +242,62 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
               {documents.filter((d) => d.status === "ready").length} docs
             </Badge>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Upload className="h-3 w-3" />
-            )}
-            Upload
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setShowUrlInput(!showUrlInput)}
+            >
+              <Link className="h-3 w-3" />
+              URL
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Upload className="h-3 w-3" />
+              )}
+              Upload
+            </Button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,.csv,.html,.json,text/plain,text/markdown,text/csv,text/html,application/json"
+            accept=".txt,.md,.csv,.html,.json,.pdf,text/plain,text/markdown,text/csv,text/html,application/json,application/pdf"
             onChange={handleUpload}
             className="hidden"
           />
         </div>
+
+        {showUrlInput && (
+          <div className="flex gap-2 mb-3">
+            <Input
+              type="url"
+              placeholder="https://example.com/page"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              className="h-7 text-xs"
+              onKeyDown={(e) => e.key === "Enter" && handleAddUrl()}
+            />
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs gap-1 shrink-0"
+              onClick={handleAddUrl}
+              disabled={addingUrl || !urlInput.trim()}
+            >
+              {addingUrl ? <Loader2 className="h-3 w-3 animate-spin" /> : <Globe className="h-3 w-3" />}
+              Add
+            </Button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-4">
@@ -231,7 +307,7 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
           <div className="text-center py-4">
             <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
             <p className="text-xs text-muted-foreground">
-              Upload .txt, .md, .csv, or .json files to build your knowledge base.
+              Upload files (.txt, .md, .csv, .json, .pdf) or add URLs to build your knowledge base.
             </p>
           </div>
         ) : (
@@ -242,7 +318,11 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
                   key={doc.id}
                   className="flex items-center gap-2 rounded-md border border-border/50 px-3 py-2 text-xs"
                 >
-                  {statusIcon(doc.status)}
+                  {doc.source_url ? (
+                    <Globe className="h-3.5 w-3.5 text-primary shrink-0" />
+                  ) : (
+                    statusIcon(doc.status)
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{doc.filename}</p>
                     <p className="text-muted-foreground">
@@ -253,12 +333,23 @@ const KnowledgeBasePanel = ({ enabled }: KnowledgeBasePanelProps) => {
                       )}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDelete(doc)}
-                    className="text-muted-foreground hover:text-destructive shrink-0 min-h-[32px] min-w-[32px] flex items-center justify-center"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    {doc.source_url && doc.status === "ready" && (
+                      <button
+                        onClick={() => handleRefresh(doc)}
+                        className="text-muted-foreground hover:text-primary min-h-[32px] min-w-[32px] flex items-center justify-center"
+                        title="Re-scrape and re-index"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(doc)}
+                      className="text-muted-foreground hover:text-destructive min-h-[32px] min-w-[32px] flex items-center justify-center"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

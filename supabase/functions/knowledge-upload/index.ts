@@ -7,10 +7,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const EMBEDDING_MODEL = "gemini-2.5-flash-lite";
+const LOVABLE_AI_ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const EMBEDDING_MODEL = "google/gemini-2.5-flash-lite";
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
+
+// ── Helpers ──
 
 function chunkText(text: string, chunkSize: number, overlap: number): string[] {
   const words = text.split(/\s+/);
@@ -29,11 +31,11 @@ function extractTextFromContent(content: string, mimeType: string): string {
   return content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-async function generateEmbedding(text: string, geminiKey: string): Promise<number[]> {
-  const response = await fetch(GEMINI_ENDPOINT, {
+async function generateEmbedding(text: string, lovableKey: string): Promise<number[]> {
+  const response = await fetch(LOVABLE_AI_ENDPOINT, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${geminiKey}`,
+      Authorization: `Bearer ${lovableKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -41,7 +43,7 @@ async function generateEmbedding(text: string, geminiKey: string): Promise<numbe
       messages: [
         {
           role: "system",
-          content: `You are an embedding generator. Given text, output exactly 768 floating point numbers between -1 and 1 separated by commas, representing a semantic embedding of the input text. Output ONLY the numbers, nothing else. No brackets, no explanation.`,
+          content: "You are an embedding generator. Given text, output exactly 768 floating point numbers between -1 and 1 separated by commas, representing a semantic embedding of the input text. Output ONLY the numbers, nothing else.",
         },
         { role: "user", content: text.slice(0, 2000) },
       ],
@@ -77,9 +79,7 @@ async function generateEmbedding(text: string, geminiKey: string): Promise<numbe
 
   const data = await response.json();
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-  if (!toolCall) {
-    throw new Error("No embedding tool call returned");
-  }
+  if (!toolCall) throw new Error("No embedding tool call returned");
 
   const args = JSON.parse(toolCall.function.arguments);
   let embedding = args.embedding;
@@ -98,6 +98,51 @@ async function generateEmbedding(text: string, geminiKey: string): Promise<numbe
   return embedding.map((v: number) => v / maxAbs);
 }
 
+async function processAndIndex(
+  adminClient: any,
+  documentId: string,
+  userId: string,
+  textContent: string,
+  lovableKey: string,
+): Promise<number> {
+  const cleanText = textContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  if (!cleanText || cleanText.length < 10) {
+    throw new Error("Document contains no extractable text");
+  }
+
+  const chunks = chunkText(cleanText, CHUNK_SIZE, CHUNK_OVERLAP);
+  console.log(`Document ${documentId}: ${chunks.length} chunks from ${cleanText.length} chars`);
+
+  // Delete existing chunks for re-processing
+  await adminClient.from("knowledge_chunks").delete().eq("document_id", documentId);
+
+  let successCount = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    try {
+      const embedding = await generateEmbedding(chunks[i], lovableKey);
+      await adminClient.from("knowledge_chunks").insert({
+        document_id: documentId,
+        user_id: userId,
+        content: chunks[i],
+        chunk_index: i,
+        embedding: `[${embedding.join(",")}]`,
+      });
+      successCount++;
+    } catch (embErr) {
+      console.error(`Chunk ${i} embedding failed:`, embErr);
+    }
+
+    if (i > 0 && i % 5 === 0) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+
+  return successCount;
+}
+
+// ── Main handler ──
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -107,9 +152,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiKey = Deno.env.get("GEMINI_API_KEY")!;
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Verify user
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -117,25 +162,29 @@ serve(async (req) => {
     if (authError || !user) throw new Error("Unauthorized");
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-
     const body = await req.json();
     const { action } = body;
 
-    // DELETE action
+    // ── DELETE ──
     if (action === "delete") {
       const { document_id } = body;
       if (!document_id) throw new Error("document_id required");
 
       const { data: doc } = await adminClient
         .from("knowledge_documents")
-        .select("file_path")
+        .select("file_path, source_url")
         .eq("id", document_id)
         .eq("user_id", user.id)
         .single();
 
       if (!doc) throw new Error("Document not found");
 
-      await adminClient.storage.from("knowledge_documents").remove([doc.file_path]);
+      // Only remove from storage if it's a file upload (not a URL)
+      if (doc.file_path && !doc.source_url) {
+        await adminClient.storage.from("knowledge_documents").remove([doc.file_path]);
+      }
+
+      await adminClient.from("knowledge_chunks").delete().eq("document_id", document_id);
       await adminClient.from("knowledge_documents").delete().eq("id", document_id);
 
       return new Response(JSON.stringify({ success: true }), {
@@ -143,7 +192,89 @@ serve(async (req) => {
       });
     }
 
-    // PROCESS action
+    // ── INGEST URL ──
+    if (action === "ingest_url") {
+      const { url } = body;
+      if (!url) throw new Error("url required");
+
+      // Scrape via Firecrawl
+      const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+      if (!firecrawlKey) throw new Error("Firecrawl connector not configured. Please connect Firecrawl in Settings.");
+
+      const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${firecrawlKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url,
+          formats: ["markdown"],
+          onlyMainContent: true,
+        }),
+      });
+
+      if (!scrapeResp.ok) {
+        const errData = await scrapeResp.json().catch(() => ({}));
+        throw new Error(`Firecrawl scrape failed (${scrapeResp.status}): ${errData.error || "Unknown error"}`);
+      }
+
+      const scrapeData = await scrapeResp.json();
+      const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+      if (!markdown || markdown.length < 20) {
+        throw new Error("No meaningful content found at that URL");
+      }
+
+      const title = scrapeData.data?.metadata?.title || new URL(url).hostname;
+      const filePath = `${user.id}/url-${Date.now()}.md`;
+
+      // Store scraped content in storage for consistency
+      const blob = new Blob([markdown], { type: "text/markdown" });
+      await adminClient.storage.from("knowledge_documents").upload(filePath, blob);
+
+      // Create document record
+      const { data: doc, error: insertError } = await adminClient
+        .from("knowledge_documents")
+        .insert({
+          user_id: user.id,
+          filename: title,
+          file_path: filePath,
+          file_size: markdown.length,
+          mime_type: "text/markdown",
+          status: "processing",
+          source_url: url,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      try {
+        const successCount = await processAndIndex(adminClient, doc.id, user.id, markdown, lovableKey);
+
+        await adminClient
+          .from("knowledge_documents")
+          .update({ status: "ready", chunk_count: successCount })
+          .eq("id", doc.id);
+
+        return new Response(
+          JSON.stringify({ success: true, document_id: doc.id, chunk_count: successCount }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (processError) {
+        console.error("URL processing error:", processError);
+        await adminClient
+          .from("knowledge_documents")
+          .update({
+            status: "error",
+            error_message: processError instanceof Error ? processError.message : "Processing failed",
+          })
+          .eq("id", doc.id);
+        throw processError;
+      }
+    }
+
+    // ── PROCESS (file upload) ──
     if (action === "process") {
       const { document_id } = body;
       if (!document_id) throw new Error("document_id required");
@@ -169,50 +300,60 @@ serve(async (req) => {
 
         if (downloadError || !fileData) throw new Error("Failed to download file");
 
-        const textContent = await fileData.text();
-        const cleanText = extractTextFromContent(textContent, doc.mime_type || "text/plain");
+        let textContent: string;
 
-        if (!cleanText || cleanText.length < 10) {
-          throw new Error("Document contains no extractable text");
-        }
+        // Handle PDF via Lovable AI (extract text using vision model)
+        if (doc.mime_type === "application/pdf") {
+          const arrayBuffer = await fileData.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-        const chunks = chunkText(cleanText, CHUNK_SIZE, CHUNK_OVERLAP);
-        console.log(`Document ${document_id}: ${chunks.length} chunks from ${cleanText.length} chars`);
+          const extractResp = await fetch(LOVABLE_AI_ENDPOINT, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "text",
+                      text: "Extract ALL text content from this PDF document. Output only the text, preserving paragraph structure. No commentary.",
+                    },
+                    {
+                      type: "image_url",
+                      image_url: { url: `data:application/pdf;base64,${base64}` },
+                    },
+                  ],
+                },
+              ],
+            }),
+          });
 
-        let successCount = 0;
-        for (let i = 0; i < chunks.length; i++) {
-          try {
-            const embedding = await generateEmbedding(chunks[i], geminiKey);
-
-            await adminClient.from("knowledge_chunks").insert({
-              document_id,
-              user_id: user.id,
-              content: chunks[i],
-              chunk_index: i,
-              embedding: `[${embedding.join(",")}]`,
-            });
-
-            successCount++;
-          } catch (embErr) {
-            console.error(`Chunk ${i} embedding failed:`, embErr);
+          if (!extractResp.ok) {
+            throw new Error(`PDF text extraction failed (${extractResp.status})`);
           }
 
-          if (i > 0 && i % 5 === 0) {
-            await new Promise((r) => setTimeout(r, 1000));
-          }
+          const extractData = await extractResp.json();
+          textContent = extractData.choices?.[0]?.message?.content || "";
+        } else {
+          textContent = await fileData.text();
+          textContent = extractTextFromContent(textContent, doc.mime_type || "text/plain");
         }
+
+        const successCount = await processAndIndex(adminClient, document_id, user.id, textContent, lovableKey);
 
         await adminClient
           .from("knowledge_documents")
-          .update({
-            status: "ready",
-            chunk_count: successCount,
-          })
+          .update({ status: "ready", chunk_count: successCount })
           .eq("id", document_id);
 
         return new Response(
           JSON.stringify({ success: true, chunk_count: successCount }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       } catch (processError) {
         console.error("Processing error:", processError);
@@ -223,7 +364,6 @@ serve(async (req) => {
             error_message: processError instanceof Error ? processError.message : "Processing failed",
           })
           .eq("id", document_id);
-
         throw processError;
       }
     }
@@ -233,7 +373,7 @@ serve(async (req) => {
     console.error("knowledge-upload error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
