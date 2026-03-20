@@ -119,6 +119,7 @@ export type Database = {
           filename: string
           id: string
           mime_type: string | null
+          source_url: string | null
           status: string
           updated_at: string
           user_id: string
@@ -132,6 +133,7 @@ export type Database = {
           filename: string
           id?: string
           mime_type?: string | null
+          source_url?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -145,6 +147,7 @@ export type Database = {
           filename?: string
           id?: string
           mime_type?: string | null
+          source_url?: string | null
           status?: string
           updated_at?: string
           user_id?: string

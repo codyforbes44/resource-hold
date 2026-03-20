@@ -1,0 +1,1 @@
+ALTER TABLE public.knowledge_documents ADD COLUMN source_url text;
