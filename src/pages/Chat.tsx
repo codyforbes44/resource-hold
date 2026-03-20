@@ -431,25 +431,13 @@ const Chat = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MODEL_GROUPS.map((group) => (
-                <SelectGroup key={group.label}>
-                  <SelectLabel>{group.label}</SelectLabel>
-                  {group.models.map((m) => (
-                    <SelectItem key={m.value} value={m.value} disabled={m.isDisabled} className={m.isDisabled ? "opacity-40 cursor-not-allowed" : ""}
-                      title={m.isDisabled ? `Not compatible with: ${m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}` : undefined}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {m.label}
-                        {m.isDisabled && (
-                          <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-                            <AlertTriangle className="h-3 w-3" />
-                            {m.incompatibleSkills.map((s) => SKILL_LABELS[s] || s).join(", ")}
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
+              {filteredModels.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  <span className="flex flex-col">
+                    <span>{m.label}</span>
+                    <span className="text-[10px] text-muted-foreground hidden md:inline">{m.description}</span>
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
