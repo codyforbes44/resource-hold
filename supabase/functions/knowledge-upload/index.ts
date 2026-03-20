@@ -245,7 +245,7 @@ serve(async (req) => {
       const { data: doc, error: insertError } = await adminClient
         .from("knowledge_documents")
         .insert({
-          user_id: user.id,
+          user_id: userId,
           filename: title,
           file_path: filePath,
           file_size: markdown.length,
