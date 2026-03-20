@@ -1,40 +1,40 @@
 
 
-## Refactor Chat Response Rendering for Best-in-Class UX
+## Auto-Refresh Knowledge Base Every 72 Hours via Cron
 
-### Problem
-The MarkdownRenderer is minimal — it only handles code blocks and inline code. Missing support for: tables (GFM), task lists, links opening in new tabs, headings with proper sizing, blockquotes, horizontal rules, lists with proper spacing, and images. The `prose` Tailwind class provides some defaults but many markdown elements render poorly or inconsistently.
+### What
+Set up a scheduled cron job that re-scrapes and re-indexes all URL-based knowledge base documents every 72 hours, keeping the knowledge base fresh.
 
 ### Changes
 
-#### 1. Install `remark-gfm` plugin
-Adds GitHub Flavored Markdown support: tables, strikethrough, task lists, autolinks.
+#### 1. Create `knowledge-refresh` edge function
+A new edge function that:
+- Queries all `knowledge_documents` where `source_url IS NOT NULL`
+- For each document, calls the existing `knowledge-upload` function's `ingest_url` logic (re-scrape via Firecrawl, re-chunk, re-embed)
+- Processes documents sequentially with rate-limiting delays
+- Updates `updated_at` timestamp on success
+- Logs errors per document but continues processing the rest
 
-#### 2. Refactor `src/components/chat/MarkdownRenderer.tsx`
-- Add `remarkGfm` plugin to ReactMarkdown
-- Add custom components for:
-  - **Links (`a`)**: Open external links in new tab with `rel="noopener noreferrer"`, styled with primary color
-  - **Tables (`table`, `thead`, `th`, `td`)**: Styled with borders, alternating row colors, horizontal scroll wrapper for mobile
-  - **Blockquotes (`blockquote`)**: Left border accent, muted background
-  - **Lists (`ul`, `ol`, `li`)**: Proper spacing and bullet/number styling
-  - **Headings (`h1`-`h4`)**: Proper size hierarchy with bottom borders on h1/h2
-  - **Horizontal rules (`hr`)**: Styled divider
-  - **Images (`img`)**: Rounded, max-height constrained, clickable to open full-size
-  - **Task lists**: Checkbox rendering for `- [x]` / `- [ ]` syntax
-- Improve the prose wrapper classes for tighter dark/light mode consistency
+The function will accept a cron-style invocation (no auth required beyond the anon key used by pg_net).
 
-#### 3. Update system prompts in `supabase/functions/chat/index.ts`
-Enhance `TIER_SYSTEM_PROMPTS` to instruct models to:
-- Use markdown formatting consistently (headers, bold, lists, tables where appropriate)
-- Structure long responses with clear sections
-- Use tables for comparisons and structured data
-- Use code blocks with language identifiers
-- Use blockquotes for citations/quotes
+#### 2. Enable `pg_cron` and `pg_net` extensions
+Required for scheduling HTTP calls from the database.
 
-This ensures models produce well-formatted output that the improved renderer can display properly.
+#### 3. Create cron job via SQL
+Schedule `net.http_post` to invoke the edge function every 72 hours:
+```sql
+SELECT cron.schedule(
+  'refresh-knowledge-base',
+  '0 0 */3 * *',  -- every 3 days at midnight
+  $$ SELECT net.http_post(...) $$
+);
+```
 
-### Files to Change
-- `src/components/chat/MarkdownRenderer.tsx` — Full refactor with GFM + custom components
-- `supabase/functions/chat/index.ts` — Enhanced system prompts (lines 24-28)
-- `package.json` — Add `remark-gfm` dependency
+#### 4. Add to `supabase/config.toml`
+Register the new function with `verify_jwt = false`.
+
+### Files
+- `supabase/functions/knowledge-refresh/index.ts` — new edge function
+- `supabase/config.toml` — add function entry
+- Database: enable extensions + create cron schedule
 
