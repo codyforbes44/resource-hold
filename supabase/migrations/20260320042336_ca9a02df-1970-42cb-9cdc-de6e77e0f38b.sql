@@ -1,0 +1,1 @@
+UPDATE model_access_defaults SET visitor_enabled = true WHERE model = 'anthropic/claude-sonnet-4';
