@@ -7,40 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import { Play, Square, Loader2 } from "lucide-react";
-
-const MODEL_GROUPS = [
-  {
-    label: "Google",
-    models: [
-      { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
-      { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-      { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-    ],
-  },
-  {
-    label: "OpenAI",
-    models: [
-      { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
-      { value: "openai/gpt-5", label: "GPT-5" },
-    ],
-  },
-  {
-    label: "Zephel",
-    models: [
-      { value: "zephel/zephel", label: "Zephel" },
-      { value: "zephel/zephel-pro", label: "Zephel Pro" },
-      { value: "zephel/zephel-fast", label: "Zephel Fast" },
-    ],
-  },
-  {
-    label: "Anthropic",
-    models: [
-      { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4" },
-      { value: "anthropic/claude-opus-4", label: "Claude Opus 4" },
-      { value: "anthropic/claude-haiku-3.5", label: "Claude Haiku 3.5" },
-    ],
-  },
-];
+import { ALL_MODEL_GROUPS } from "@/lib/models";
 
 const TTS_VOICES = [
   { value: "JBFqnCBsd6RMkjVDRZzb", label: "George (Default)" },
@@ -72,15 +39,8 @@ interface PreferencesTabProps {
 }
 
 const PreferencesTab = ({
-  userId,
-  defaultModel,
-  setDefaultModel,
-  ttsVoiceId,
-  setTtsVoiceId,
-  notificationsEnabled,
-  setNotificationsEnabled,
-  loading,
-  setLoading,
+  userId, defaultModel, setDefaultModel, ttsVoiceId, setTtsVoiceId,
+  notificationsEnabled, setNotificationsEnabled, loading, setLoading,
 }: PreferencesTabProps) => {
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
@@ -89,21 +49,14 @@ const PreferencesTab = ({
   const handleSavePreferences = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("user_settings")
-        .upsert({
-          user_id: userId,
-          default_model: defaultModel,
-          notifications_enabled: notificationsEnabled,
-          tts_voice_id: ttsVoiceId,
-        }, { onConflict: "user_id" });
+      const { error } = await supabase.from("user_settings").upsert({
+        user_id: userId, default_model: defaultModel,
+        notifications_enabled: notificationsEnabled, tts_voice_id: ttsVoiceId,
+      }, { onConflict: "user_id" });
       if (error) throw error;
       toast.success("Preferences saved");
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { toast.error(err.message); }
+    finally { setLoading(false); }
   };
 
   const handlePreviewVoice = async () => {
@@ -118,43 +71,22 @@ const PreferencesTab = ({
     setLoadingPreview(true);
     setPreviewingVoice(null);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            text: "Hello! This is a preview of how I sound. How do you like my voice?",
-            voiceId: ttsVoiceId,
-          }),
-        }
-      );
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ text: "Hello! This is a preview of how I sound. How do you like my voice?", voiceId: ttsVoiceId }),
+      });
       if (!res.ok) throw new Error("Preview failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       previewAudioRef.current = audio;
       setPreviewingVoice(ttsVoiceId);
-      audio.onended = () => {
-        setPreviewingVoice(null);
-        previewAudioRef.current = null;
-        URL.revokeObjectURL(url);
-      };
-      audio.onerror = () => {
-        setPreviewingVoice(null);
-        previewAudioRef.current = null;
-        URL.revokeObjectURL(url);
-      };
+      audio.onended = () => { setPreviewingVoice(null); previewAudioRef.current = null; URL.revokeObjectURL(url); };
+      audio.onerror = () => { setPreviewingVoice(null); previewAudioRef.current = null; URL.revokeObjectURL(url); };
       await audio.play();
-    } catch {
-      toast.error("Failed to preview voice");
-    } finally {
-      setLoadingPreview(false);
-    }
+    } catch { toast.error("Failed to preview voice"); }
+    finally { setLoadingPreview(false); }
   };
 
   return (
@@ -167,13 +99,11 @@ const PreferencesTab = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MODEL_GROUPS.map((group) => (
+              {ALL_MODEL_GROUPS.map((group) => (
                 <SelectGroup key={group.label}>
                   <SelectLabel>{group.label}</SelectLabel>
                   {group.models.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                   ))}
                 </SelectGroup>
               ))}
@@ -191,28 +121,12 @@ const PreferencesTab = ({
               </SelectTrigger>
               <SelectContent>
                 {TTS_VOICES.map((v) => (
-                  <SelectItem key={v.value} value={v.value}>
-                    {v.label}
-                  </SelectItem>
+                  <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="min-h-[44px] min-w-[44px] shrink-0"
-              disabled={loadingPreview}
-              title="Preview voice"
-              onClick={handlePreviewVoice}
-            >
-              {loadingPreview ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : previewingVoice === ttsVoiceId ? (
-                <Square className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
+            <Button type="button" variant="outline" size="icon" className="min-h-[44px] min-w-[44px] shrink-0" disabled={loadingPreview} title="Preview voice" onClick={handlePreviewVoice}>
+              {loadingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : previewingVoice === ttsVoiceId ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
           </div>
         </div>
@@ -230,10 +144,7 @@ const PreferencesTab = ({
             <p className="text-sm font-medium">Notifications</p>
             <p className="text-xs text-muted-foreground">Enable desktop notifications</p>
           </div>
-          <Switch
-            checked={notificationsEnabled}
-            onCheckedChange={setNotificationsEnabled}
-          />
+          <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} />
         </div>
 
         <Button onClick={handleSavePreferences} disabled={loading} className="w-full sm:w-auto">
