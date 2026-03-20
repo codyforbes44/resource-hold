@@ -103,20 +103,7 @@ const Chat = () => {
 
   useEffect(() => { if (isMobile) setSidebarOpen(false); }, [isMobile]);
 
-  // Auto-switch model if incompatible with active skills
-  useEffect(() => {
-    const active = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
-    if (active.length === 0) return;
-    const incompatible = getIncompatibleSkills(model, active);
-    if (incompatible.length > 0) {
-      const allAllowed = ALL_MODEL_GROUPS.flatMap((g) => g.models).filter((m) => !allowedModels || allowedModels.includes(m.value));
-      const first = allAllowed.find((m) => getIncompatibleSkills(m.value, active).length === 0);
-      if (first) {
-        setModel(first.value);
-        toast.info(`Switched to ${first.label} — ${incompatible.map((s) => SKILL_LABELS[s] || s).join(", ")} not supported by previous model`);
-      }
-    }
-  }, [skills, allowedModels]);
+  // No auto-switch needed — all tiers support all skills
 
   // Load conversations
   useEffect(() => {
