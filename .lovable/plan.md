@@ -1,27 +1,29 @@
 
 
-## Completed: Comprehensive Refactor + Claude Integration
+## Completed: Consolidate to 4 Branded Model Tiers
 
 ### What Was Done
 
-1. **Shared model config** (`src/lib/models.ts`) — Single source of truth for ALL_MODEL_GROUPS, MODEL_SKILL_COMPAT, SKILL_LABELS, with helpers `getIncompatibleSkills()` and `getFilteredModelGroups()`. Claude Sonnet 4 and Opus 4 now support `image_generation`.
+1. **`src/lib/models.ts`** — Replaced 15 provider models (Google, OpenAI, Zephel, Anthropic) with 4 branded tiers:
+   - `gclaw/default` → gClaw (Balanced) → `google/gemini-3-flash-preview`
+   - `gclaw/flash` → gClaw Flash (Fast) → `google/gemini-2.5-flash`
+   - `gclaw/nano` → gClaw Nano (Lightweight) → `google/gemini-2.5-flash-lite`
+   - `gclaw/thinking` → gClaw Thinking (Deep reasoning) → `google/gemini-2.5-pro`
+   - Removed `MODEL_SKILL_COMPAT`, `getIncompatibleSkills`, `getFilteredModelGroups` — all tiers support all 7 skills universally.
 
-2. **Chat.tsx refactored** from 1378 → ~310 lines via extraction:
-   - `src/lib/chat-storage.ts` — localStorage helpers
-   - `src/lib/models.ts` — model config
-   - `src/components/chat/ChatSidebar.tsx` — sidebar with search, nav, conversation list
-   - `src/components/chat/ChatMessages.tsx` — message list, empty state, suggested prompts
-   - `src/components/chat/ChatInput.tsx` — auto-resizing textarea (grows up to 6 rows), Enter to send, Shift+Enter for newline
-   - `src/components/chat/MessageActions.tsx` — copy, TTS, regenerate, delete per message
+2. **`supabase/functions/chat/index.ts`** — Complete rewrite:
+   - All requests routed through Lovable AI gateway (no more direct Gemini/OpenAI/Anthropic/Zephel API calls)
+   - `resolveModel()` maps tier → backend model
+   - Per-tier system prompts (balanced, concise, ultra-brief, analytical)
+   - Removed Anthropic adapter, Zephel routing, multi-provider logic
 
-3. **Mobile UX fixes**:
-   - Message actions: tap-to-reveal on mobile (replaces broken `group-hover`)
-   - Auto-resizing textarea replaces single-line input
-   - Skills panel defaults to closed
-   - Active skills indicator moved inside input area
+3. **`src/pages/Chat.tsx`** — Simplified model selector:
+   - Flat 4-item dropdown (no groups, no compat warnings)
+   - Removed auto-switch-model-on-skill-toggle effect
+   - Guest default: `gclaw/nano`, authenticated default: `gclaw/default`
 
-4. **Edge function hardened**:
-   - Malformed `tool_calls` arguments gracefully handled with try/catch
-   - Anthropic adapter `tool_use` block parsing guards against non-JSON input
+4. **`src/components/settings/PreferencesTab.tsx`** — Updated to use `GCLAW_MODELS` with descriptions
 
-5. **PreferencesTab** now imports from shared `ALL_MODEL_GROUPS` — no duplication.
+5. **Database** — `model_access_defaults` updated:
+   - Deleted all 15 old provider model rows
+   - Inserted 4 new tier rows (`gclaw/thinking` requires auth)
