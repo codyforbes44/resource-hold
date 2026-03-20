@@ -393,8 +393,7 @@ const Chat = () => {
     );
 
   const activeSkillCount = skills.filter((s) => s.enabled).length;
-  const activeSkillsForCompat = skills.filter((s) => s.enabled && s.id !== "code_interpreter").map((s) => s.id);
-  const MODEL_GROUPS = getFilteredModelGroups(allowedModels, activeSkillsForCompat);
+  const filteredModels = allowedModels ? GCLAW_MODELS.filter((m) => allowedModels.includes(m.value)) : GCLAW_MODELS;
 
   return (
     <div className="flex h-[100dvh] bg-background">
