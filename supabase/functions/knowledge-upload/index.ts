@@ -259,7 +259,7 @@ serve(async (req) => {
       if (insertError) throw insertError;
 
       try {
-        const successCount = await processAndIndex(adminClient, doc.id, user.id, markdown, lovableKey);
+        const successCount = await processAndIndex(adminClient, doc.id, userId, markdown, lovableKey);
 
         await adminClient
           .from("knowledge_documents")
