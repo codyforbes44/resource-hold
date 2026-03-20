@@ -45,7 +45,7 @@ const Chat = () => {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState(isGuest ? "zephel/zephel-fast" : ALL_MODEL_GROUPS[0].models[0].value);
+  const [model, setModel] = useState(isGuest ? GUEST_DEFAULT_MODEL : DEFAULT_MODEL);
   const [allowedModels, setAllowedModels] = useState<string[] | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
