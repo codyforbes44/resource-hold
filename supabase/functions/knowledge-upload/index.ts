@@ -292,7 +292,7 @@ serve(async (req) => {
         .from("knowledge_documents")
         .select("*")
         .eq("id", document_id)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (docError || !doc) throw new Error("Document not found");
