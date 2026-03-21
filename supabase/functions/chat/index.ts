@@ -396,7 +396,7 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
           { role: "user", content: query.slice(0, 2000) },
         ],
       }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(25000),
     });
 
     if (!embResponse.ok) return `Knowledge search failed: embedding generation error (${embResponse.status})`;
