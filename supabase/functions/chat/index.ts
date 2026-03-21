@@ -780,7 +780,7 @@ When you use a tool and get results, synthesize the information into a helpful r
           user_message: lastUserMsg.slice(0, 200),
         },
         parent_run_id: parentRunId || undefined,
-        extra: { metadata: { timp_context: !!timpContext } },
+        extra: { metadata: {} },
       });
 
       const conversationContext = messages
