@@ -386,39 +386,47 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite",
+        stream: false,
+        max_tokens: 8000,
         messages: [
           {
             role: "system",
-            content: "You are an embedding generator. Given text, output exactly 768 floating point numbers between -1 and 1 separated by commas, representing a semantic embedding of the input text. Output ONLY the numbers, nothing else.",
+            content: "You are an embedding generator. Output exactly 768 floating point numbers between -1 and 1, separated by commas. No text, no explanation, no brackets — ONLY comma-separated numbers.",
           },
           { role: "user", content: query.slice(0, 2000) },
         ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "store_embedding",
-            description: "Store a 768-dimensional embedding vector",
-            parameters: {
-              type: "object",
-              properties: {
-                embedding: { type: "array", items: { type: "number" }, description: "768-dim vector" },
-              },
-              required: ["embedding"],
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "store_embedding" } },
       }),
+      signal: AbortSignal.timeout(25000),
     });
 
     if (!embResponse.ok) return `Knowledge search failed: embedding generation error (${embResponse.status})`;
 
-    const embData = await embResponse.json();
-    const toolCall = embData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) return "Knowledge search failed: no embedding generated";
+    const embText = await embResponse.text();
+    let rawContent = "";
+    try {
+      if (embText.startsWith("data: ") || embText.startsWith(":")) {
+        const lines = embText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
+        for (const l of lines) {
+          try {
+            const c = JSON.parse(l.slice(6));
+            rawContent += c.choices?.[0]?.delta?.content || c.choices?.[0]?.message?.content || "";
+          } catch { /* skip */ }
+        }
+      } else {
+        const data = JSON.parse(embText);
+        rawContent = data.choices?.[0]?.message?.content || "";
+      }
+    } catch (parseErr) {
+      console.error("Embedding response parse error:", embText.slice(0, 300));
+      return "Knowledge search failed: embedding response parse error";
+    }
 
-    let embedding = JSON.parse(toolCall.function.arguments).embedding;
+    if (!rawContent) return "Knowledge search failed: no embedding content";
+
+    // Parse comma-separated numbers
+    const numbers = rawContent.replace(/[\[\]\n\r\s]/g, "").split(",").map(Number).filter(n => !isNaN(n));
+    let embedding = numbers;
+    if (embedding.length === 0) return "Knowledge search failed: invalid embedding";
     if (!Array.isArray(embedding)) return "Knowledge search failed: invalid embedding";
 
     if (embedding.length < 768) embedding = [...embedding, ...new Array(768 - embedding.length).fill(0)];
