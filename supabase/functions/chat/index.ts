@@ -229,58 +229,6 @@ const SKILL_TOOLS: Record<string, any> = {
       },
     },
   },
-  taskade_create_task: {
-    type: "function",
-    function: {
-      name: "taskade_create_task",
-      description: "Create a task in the user's default Taskade project.",
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "The task title" },
-          description: { type: "string", description: "Optional task description" },
-        },
-        required: ["title"],
-      },
-    },
-  },
-  taskade_list_tasks: {
-    type: "function",
-    function: {
-      name: "taskade_list_tasks",
-      description: "List tasks from the user's default Taskade project.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  taskade_create_project: {
-    type: "function",
-    function: {
-      name: "taskade_create_project",
-      description: "Create a new Taskade project.",
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "The project title" },
-        },
-        required: ["title"],
-      },
-    },
-  },
-  taskade_prompt_agent: {
-    type: "function",
-    function: {
-      name: "taskade_prompt_agent",
-      description: "Prompt a Taskade agent with a question or instruction.",
-      parameters: {
-        type: "object",
-        properties: {
-          message: { type: "string", description: "The prompt message for the agent" },
-          agent_id: { type: "string", description: "The agent ID to prompt" },
-        },
-        required: ["message"],
-      },
-    },
-  },
 };
 
 async function executeWebSearch(query: string): Promise<string> {
@@ -523,73 +471,6 @@ async function executeBrowsePage(url: string): Promise<string> {
   }
 }
 
-// ── Taskade tool executors ──
-
-const TASKADE_BASE = "https://www.taskade.com/api/v1";
-
-async function taskadeApiCall(path: string, method: string = "GET", body?: unknown): Promise<any> {
-  const apiKey = Deno.env.get("TASKADE_API_KEY");
-  if (!apiKey) return { error: "Taskade API key not configured" };
-  const resp = await fetch(`${TASKADE_BASE}${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  return resp.json().catch(() => ({}));
-}
-
-async function executeTaskadeCreateTask(title: string, description: string, userId: string): Promise<string> {
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const client = createClient(supabaseUrl, serviceRoleKey);
-    const { data: config } = await client.from("taskade_configs").select("default_project_id").eq("user_id", userId).single();
-    const projectId = config?.default_project_id;
-    if (!projectId) return "No default Taskade project configured. Ask the user to set one in Admin → Taskade.";
-    const result = await taskadeApiCall(`/projects/${projectId}/tasks`, "POST", { title, description });
-    if (result?.error) return `Failed to create task: ${result.error}`;
-    return `Task created: "${title}"${description ? ` — ${description}` : ""}`;
-  } catch (e) {
-    return `Taskade error: ${e instanceof Error ? e.message : "Unknown"}`;
-  }
-}
-
-async function executeTaskadeListTasks(userId: string): Promise<string> {
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const client = createClient(supabaseUrl, serviceRoleKey);
-    const { data: config } = await client.from("taskade_configs").select("default_project_id").eq("user_id", userId).single();
-    const projectId = config?.default_project_id;
-    if (!projectId) return "No default Taskade project configured.";
-    const result = await taskadeApiCall(`/projects/${projectId}/tasks`);
-    const tasks = result?.items || result?.tasks || [];
-    if (tasks.length === 0) return "No tasks found in the default project.";
-    return tasks.map((t: any, i: number) => `${i + 1}. ${t.completed ? "✅" : "⬜"} ${t.title}`).join("\n");
-  } catch (e) {
-    return `Taskade error: ${e instanceof Error ? e.message : "Unknown"}`;
-  }
-}
-
-async function executeTaskadeCreateProject(title: string): Promise<string> {
-  try {
-    const result = await taskadeApiCall("/projects", "POST", { title });
-    if (result?.error) return `Failed to create project: ${result.error}`;
-    return `Taskade project "${title}" created successfully.${result?.id ? ` ID: ${result.id}` : ""}`;
-  } catch (e) {
-    return `Taskade error: ${e instanceof Error ? e.message : "Unknown"}`;
-  }
-}
-
-async function executeTaskadePromptAgent(agentId: string, message: string): Promise<string> {
-  try {
-    if (!agentId) return "No agent_id provided. The user needs to specify which Taskade agent to prompt.";
-    const result = await taskadeApiCall(`/agents/${agentId}/conversations`, "POST", { message });
-    return result?.response || result?.message?.content || JSON.stringify(result);
-  } catch (e) {
-    return `Taskade agent error: ${e instanceof Error ? e.message : "Unknown"}`;
-  }
-}
 
 async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
@@ -600,10 +481,6 @@ async function executeTool(name: string, args: Record<string, any>, userId: stri
     case "store_memory": return await executeStoreMemory(args.key, args.value, args.category, userId);
     case "recall_memory": return await executeRecallMemory(args.category, userId);
     case "browse_page": return await executeBrowsePage(args.url);
-    case "taskade_create_task": return await executeTaskadeCreateTask(args.title, args.description || "", userId);
-    case "taskade_list_tasks": return await executeTaskadeListTasks(userId);
-    case "taskade_create_project": return await executeTaskadeCreateProject(args.title);
-    case "taskade_prompt_agent": return await executeTaskadePromptAgent(args.agent_id, args.message);
     default: return `Unknown tool: ${name}`;
   }
 }
@@ -727,12 +604,6 @@ serve(async (req) => {
     }
     if (enabledSkills.includes("memory") && SKILL_TOOLS["memory_recall"]) {
       tools.push(SKILL_TOOLS["memory_recall"]);
-    }
-    // Taskade skill adds multiple tools
-    if (enabledSkills.includes("taskade")) {
-      for (const key of ["taskade_create_task", "taskade_list_tasks", "taskade_create_project", "taskade_prompt_agent"]) {
-        if (SKILL_TOOLS[key]) tools.push(SKILL_TOOLS[key]);
-      }
     }
 
     // Build memory context
@@ -987,10 +858,6 @@ When you use a tool and get results, synthesize the information into a helpful r
         : fnName === "store_memory" ? "🧠 Saving to memory..."
         : fnName === "recall_memory" ? "🧠 Recalling memories..."
         : fnName === "browse_page" ? "🌐 Browsing page..."
-        : fnName === "taskade_create_task" ? "📋 Creating Taskade task..."
-        : fnName === "taskade_list_tasks" ? "📋 Fetching Taskade tasks..."
-        : fnName === "taskade_create_project" ? "📁 Creating Taskade project..."
-        : fnName === "taskade_prompt_agent" ? "🤖 Prompting Taskade agent..."
         : `⚡ Running ${fnName}...`;
       toolStatusChunks.push(
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`

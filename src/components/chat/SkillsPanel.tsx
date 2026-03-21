@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Code, ImageIcon, BookOpen, FlaskConical, X, Sparkles, Brain, Globe, CheckSquare } from "lucide-react";
+import { Search, Code, ImageIcon, BookOpen, FlaskConical, X, Sparkles, Brain, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -78,15 +78,6 @@ const DEFAULT_SKILLS: Skill[] = [
     enabled: false,
     badge: "Firecrawl",
     color: "hsl(190 80% 45%)",
-  },
-  {
-    id: "taskade",
-    name: "Taskade",
-    description: "Create tasks, manage projects, and prompt Taskade agents directly from chat.",
-    icon: CheckSquare,
-    enabled: false,
-    badge: "Integration",
-    color: "hsl(25 90% 55%)",
   },
 ];
 

@@ -12,13 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import AppShell from "@/components/AppShell";
 import KnowledgeBaseTab from "@/components/admin/KnowledgeBaseTab";
-import TaskadeTab from "@/components/admin/TaskadeTab";
+
 import PersonalitiesTab from "@/components/admin/PersonalitiesTab";
 import { toast } from "sonner";
 import {
   Users, MessageSquare, ClipboardList, BarChart3, Search,
   Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen, Sparkles,
-  ExternalLink, Activity, CheckSquare,
+  ExternalLink, Activity,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -190,9 +190,6 @@ const Admin = () => {
           <TabsTrigger value="audit" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <ClipboardList className="h-4 w-4 hidden sm:block" /> Audit
           </TabsTrigger>
-          <TabsTrigger value="taskade" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
-            <CheckSquare className="h-4 w-4 hidden sm:block" /> Taskade
-          </TabsTrigger>
           <TabsTrigger value="system" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <BarChart3 className="h-4 w-4 hidden sm:block" /> System
           </TabsTrigger>
@@ -326,10 +323,6 @@ const Admin = () => {
           />
         </TabsContent>
 
-        {/* Taskade Tab */}
-        <TabsContent value="taskade">
-          <TaskadeTab />
-        </TabsContent>
 
         {/* Conversations Tab */}
         <TabsContent value="conversations" className="space-y-4">

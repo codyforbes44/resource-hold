@@ -1,41 +1,60 @@
 
 
-## Remove All Taskade Exposure from Users
+## Agent Council + LangChain Orchestration
 
-### What
-Remove all Taskade-related UI, chat skills, and tool definitions so no user can access Taskade resources. Keep the backend edge function and database tables intact (no data loss), but remove all user-facing entry points.
+### Current State
 
-### Changes
+- **Agent Council**: Multi-agent deliberation framework with 5 specialist agents (Code, Research, Memory, Task, Creative)
+- **LangSmith**: REST-based observability tracing with full chain/agent/tool hierarchy
+- **TIMP**: Proprietary knowledge base document indexed via RAG (3 chunks in `knowledge_documents`). Surfaced automatically via the `search_knowledge` tool when users ask about it. No external TIMP service — no HTTP client needed.
+- **Knowledge Base RAG**: Handles all document retrieval including TIMP documentation
+- **Taskade**: Backend integration preserved but fully removed from user-facing surfaces (no skills panel entry, no admin tab, no chat tools)
 
-#### 1. `src/components/chat/SkillsPanel.tsx`
-- Remove the Taskade skill entry from the `DEFAULT_SKILLS` array (lines 82-90)
-- Remove the `CheckSquare` import if no longer used
+### Architecture
 
-#### 2. `src/pages/Admin.tsx`
-- Remove the Taskade tab trigger (line 193-195)
-- Remove the Taskade tab content (lines 329-332)
-- Remove the `TaskadeTab` import (line 15)
-- Remove `CheckSquare` from lucide imports if unused
+```text
+User Message
+     │
+     ▼
+┌─────────────────────────────────┐
+│        Agent Council Router     │  ← Determines which agents to consult
+│   (Complexity + skill analysis) │
+└──────────┬──────────────────────┘
+           │
+     ┌─────┼─────┬─────────┐
+     ▼     ▼     ▼         ▼
+  ┌─────┐ ┌────┐ ┌──────┐ ┌──────────┐
+  │Coder│ │Res.│ │Memory│ │Creative  │
+  │Agent│ │Agt.│ │Agent │ │Agent     │
+  └──┬──┘ └─┬──┘ └──┬───┘ └────┬─────┘
+     │      │       │           │
+     └──────┴───┬───┴───────────┘
+                ▼
+     ┌──────────────────┐
+     │  Council Merger   │  ← Synthesizes agent outputs
+     │  (Final LLM call) │
+     └────────┬─────────┘
+              │
+              ▼
+     ┌──────────────────┐
+     │  LangSmith Trace  │  ← Full chain traced
+     └──────────────────┘
+```
 
-#### 3. `supabase/functions/chat/index.ts`
-- Remove 4 Taskade tool definitions from `SKILL_TOOLS`: `taskade_create_task`, `taskade_list_tasks`, `taskade_create_project`, `taskade_prompt_agent`
-- Remove the 4 Taskade executor functions: `taskadeApiCall`, `executeTaskadeCreateTask`, `executeTaskadeListTasks`, `executeTaskadeCreateProject`, `executeTaskadePromptAgent`
-- Remove Taskade cases from the `executeTool` switch
-- Remove the `if (enabledSkills.includes("taskade"))` block that adds Taskade tools
-- Remove the 4 Taskade status messages from the streaming section
-- Remove `TASKADE_BASE` constant
+### Key Files
 
-#### 4. Files NOT changed (preserved)
-- `supabase/functions/taskade/index.ts` — edge function stays (admin backend)
-- `src/integrations/taskade/` — service layer stays (unused but harmless)
-- `src/hooks/useTaskade.ts` — stays (unused but harmless)
-- `src/components/admin/TaskadeTab.tsx` — stays on disk but unreachable (no route to it)
-- Database tables `taskade_configs`, `taskade_sync_log` — preserved
+| File | Purpose |
+|------|---------|
+| `supabase/functions/chat/index.ts` | Main chat handler with tool execution, LangSmith tracing, council routing |
+| `supabase/functions/chat/agent-council.ts` | Agent Council framework: routing, specialist agents, merger |
 
-### Files Modified
-| File | Action |
-|------|--------|
-| `src/components/chat/SkillsPanel.tsx` | Remove Taskade skill |
-| `src/pages/Admin.tsx` | Remove Taskade tab |
-| `supabase/functions/chat/index.ts` | Remove all Taskade tools, executors, and references |
+### TIMP as Knowledge Base
 
+TIMP documentation is stored as a knowledge base document (`.txt` file, 3 chunks, status: ready). When users ask about TIMP, the `search_knowledge` tool retrieves relevant chunks via vector similarity search. No external TIMP API service exists or is needed.
+
+### Taskade (Hidden from Users)
+
+Backend infrastructure (`supabase/functions/taskade/`, `taskade_configs`, `taskade_sync_log`) is preserved but all user-facing entry points have been removed:
+- No skills panel entry
+- No admin dashboard tab
+- No chat tool definitions or executors
