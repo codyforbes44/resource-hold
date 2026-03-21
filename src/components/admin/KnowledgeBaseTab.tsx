@@ -55,12 +55,15 @@ const statusColor = (status: string) => {
 const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh }: KnowledgeBaseTabProps) => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [newUrl, setNewUrl] = useState("");
   const [addingUrl, setAddingUrl] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const categories = Array.from(new Set(documents.map((d) => d.category || "general"))).sort();
 
   const filtered = documents.filter((d) => {
     const matchesSearch = !search ||
