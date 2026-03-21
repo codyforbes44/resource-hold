@@ -121,30 +121,38 @@ async function processAndIndex(
 
   for (let start = 0; start < chunks.length; start += EMBEDDING_CONCURRENCY) {
     const batch = chunks.slice(start, start + EMBEDDING_CONCURRENCY);
-    const results = await Promise.all(
+    const embeddings = await Promise.all(
       batch.map(async (chunk, batchIndex) => {
         const chunkIndex = start + batchIndex;
 
         try {
           const embedding = await generateEmbedding(chunk, lovableKey);
-          const { error } = await adminClient.from("knowledge_chunks").insert({
-            document_id: documentId,
-            user_id: userId,
-            content: chunk,
-            chunk_index: chunkIndex,
-            embedding: `[${embedding.join(",")}]`,
-          });
-
-          if (error) throw error;
-          return 1;
+          return { chunk, chunkIndex, embedding };
         } catch (embErr) {
           console.error(`Chunk ${chunkIndex} embedding failed:`, embErr);
-          return 0;
+          return null;
         }
       }),
     );
 
-    successCount += results.reduce((sum, value) => sum + value, 0);
+    for (const result of embeddings) {
+      if (!result) continue;
+
+      const { error } = await adminClient.from("knowledge_chunks").insert({
+        document_id: documentId,
+        user_id: userId,
+        content: result.chunk,
+        chunk_index: result.chunkIndex,
+        embedding: `[${result.embedding.join(",")}]`,
+      });
+
+      if (error) {
+        console.error(`Chunk ${result.chunkIndex} insert failed:`, error);
+        continue;
+      }
+
+      successCount++;
+    }
 
     if (start + EMBEDDING_CONCURRENCY < chunks.length) {
       await new Promise((r) => setTimeout(r, 250));
