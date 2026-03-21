@@ -44,7 +44,7 @@ const AGENTS: AgentSpec[] = [
     id: "memory",
     name: "MemoryAgent",
     description: "User context recall, preference tracking, session history",
-    systemPrompt: `You are the Memory Specialist in an AI council. Your role is to recall relevant user context, preferences, and historical interactions. Highlight any stored memories that are relevant to the current query. Output ONLY your specialist perspective.`,
+    systemPrompt: `You are the Memory Specialist in an AI council. Your role is to recall relevant user context, preferences, and stored memories from the user_memory table. Highlight any stored information that is relevant to the current query. Output ONLY your specialist perspective.`,
     skillTriggers: ["memory"],
     keywords: [/\b(remember|recall|last time|previously|my preference|you told me|history|context)\b/i],
   },

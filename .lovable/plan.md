@@ -1,29 +1,52 @@
 
 
-## Refactor TIMP: External Service → Knowledge Base Reference
+## Agent Council + LangChain Orchestration
 
-### What's Wrong
+### Current State
 
-The codebase treats TIMP as a **live external API service** with an HTTP client (`timp-client.ts`) that calls `TIMP_BASE_URL/sessions`, `TIMP_BASE_URL/search`, etc. But TIMP is actually a **proprietary knowledge base document** — a `.txt` file already ingested into the RAG system (3 chunks, status: ready). There is no live TIMP service to call.
+- **Agent Council**: Multi-agent deliberation framework with 5 specialist agents (Code, Research, Memory, Task, Creative)
+- **LangSmith**: REST-based observability tracing with full chain/agent/tool hierarchy
+- **TIMP**: Proprietary knowledge base document indexed via RAG (3 chunks in `knowledge_documents`). Surfaced automatically via the `search_knowledge` tool when users ask about it. No external TIMP service — no HTTP client needed.
+- **Knowledge Base RAG**: Handles all document retrieval including TIMP documentation
 
-### What Changes
+### Architecture
 
-1. **Delete `supabase/functions/chat/timp-client.ts`** — the entire external HTTP client is unnecessary
-2. **Update `supabase/functions/chat/index.ts`** — remove all TIMP client imports, initialization, context fetching, and fire-and-forget session storage calls. The existing `search_knowledge` tool already surfaces TIMP documentation when users ask about it via RAG.
-3. **Update `supabase/functions/chat/agent-council.ts`** — remove any MemoryAgent references to TIMP historical search; the MemoryAgent still handles user memory recall via the existing `user_memory` table
+```text
+User Message
+     │
+     ▼
+┌─────────────────────────────────┐
+│        Agent Council Router     │  ← Determines which agents to consult
+│   (Complexity + skill analysis) │
+└──────────┬──────────────────────┘
+           │
+     ┌─────┼─────┬─────────┐
+     ▼     ▼     ▼         ▼
+  ┌─────┐ ┌────┐ ┌──────┐ ┌──────────┐
+  │Coder│ │Res.│ │Memory│ │Taskade   │
+  │Agent│ │Agt.│ │Agent │ │Agent     │
+  └──┬──┘ └─┬──┘ └──┬───┘ └────┬─────┘
+     │      │       │           │
+     └──────┴───┬───┴───────────┘
+                ▼
+     ┌──────────────────┐
+     │  Council Merger   │  ← Synthesizes agent outputs
+     │  (Final LLM call) │
+     └────────┬─────────┘
+              │
+              ▼
+     ┌──────────────────┐
+     │  LangSmith Trace  │  ← Full chain traced
+     └──────────────────┘
+```
 
-### What Stays the Same
+### Key Files
 
-- **Agent Council** — fully intact, no changes to routing/merger logic
-- **LangSmith tracing** — unchanged
-- **Knowledge Base RAG** — TIMP docs are already indexed and retrievable via the `search_knowledge` tool
-- **MemoryAgent** — still works for user preference/context recall, just without TIMP API calls
+| File | Purpose |
+|------|---------|
+| `supabase/functions/chat/index.ts` | Main chat handler with tool execution, LangSmith tracing, council routing |
+| `supabase/functions/chat/agent-council.ts` | Agent Council framework: routing, specialist agents, merger |
 
-### Files
+### TIMP as Knowledge Base
 
-| File | Action |
-|------|--------|
-| `supabase/functions/chat/timp-client.ts` | **Delete** |
-| `supabase/functions/chat/index.ts` | Remove TIMP import, initialization, context fetch, and 3 `storeSessionAsync` calls |
-| `.lovable/plan.md` | Update to reflect TIMP as knowledge base content, not external service |
-
+TIMP documentation is stored as a knowledge base document (`.txt` file, 3 chunks, status: ready). When users ask about TIMP, the `search_knowledge` tool retrieves relevant chunks via vector similarity search. No external TIMP API service exists or is needed.
