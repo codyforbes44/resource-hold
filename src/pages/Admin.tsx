@@ -397,6 +397,33 @@ const Admin = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+           </div>
+          <div className="rounded-lg border border-border p-4">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" /> LLM Observability
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              All chat LLM calls, tool executions, and errors are traced via LangSmith for monitoring and debugging.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div className="rounded-md bg-muted/50 p-3">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Project</p>
+                <p className="text-sm font-mono font-medium">gclaw-chat</p>
+              </div>
+              <div className="rounded-md bg-muted/50 p-3">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Traced Events</p>
+                <p className="text-sm font-medium">LLM calls · Tool runs · Errors</p>
+              </div>
+            </div>
+            <a
+              href="https://smith.langchain.com/o/default/projects"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open LangSmith Dashboard
+            </a>
           </div>
         </TabsContent>
       </Tabs>
