@@ -66,7 +66,7 @@ const Admin = () => {
 
   useEffect(() => {
     if (roleLoading) return;
-    if (!isAdmin) { toast.error("Access denied — admin role required"); navigate("/chat"); return; }
+    if (!isAdmin) { toast.error("Access denied — admin role required"); navigate("/"); return; }
     loadAdminData();
   }, [isAdmin, roleLoading]);
 
