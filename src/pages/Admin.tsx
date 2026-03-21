@@ -60,6 +60,7 @@ const Admin = () => {
   const [togglingModel, setTogglingModel] = useState<string | null>(null);
   const [kbDocs, setKbDocs] = useState<any[]>([]);
   const [kbStats, setKbStats] = useState({ totalDocs: 0, totalChunks: 0, pendingDocs: 0, errorDocs: 0 });
+  const [personalities, setPersonalities] = useState<any[]>([]);
 
   useEffect(() => {
     if (roleLoading) return;
