@@ -250,6 +250,7 @@ serve(async (req) => {
           pendingDocs: kbPendingRes.count || 0,
           errorDocs: kbErrorRes.count || 0,
         },
+        personalities: personalitiesRes.data || [],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
