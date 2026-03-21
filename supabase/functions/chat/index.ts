@@ -889,7 +889,15 @@ When you use a tool and get results, synthesize the information into a helpful r
 
       // Fire-and-forget: patch LLM + parent as complete (we can't easily count streamed tokens)
       lsPatchRun(llmRunId, { outputs: { streamed: true } });
-      lsPatchRun(parentRunId, { outputs: { path: "no-tools-stream", model: backendModel } });
+      lsPatchRun(parentRunId, { outputs: { path: "no-tools-stream", model: backendModel, council_decision: councilDecision.reason } });
+
+      // TIMP: fire-and-forget (we can't capture streamed content, but log the interaction)
+      timp.storeSessionAsync(
+        parentRunId || crypto.randomUUID(),
+        lastUserMsg,
+        "[streamed response]",
+        { model: backendModel, path: "no-tools-stream" },
+      );
 
       return new Response(response.body, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
