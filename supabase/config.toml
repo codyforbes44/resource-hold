@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.knowledge-refresh]
 verify_jwt = false
+
+[functions.taskade]
+verify_jwt = false

@@ -314,6 +314,72 @@ export type Database = {
         }
         Relationships: []
       }
+      taskade_configs: {
+        Row: {
+          created_at: string
+          default_folder_id: string | null
+          default_project_id: string | null
+          enabled_features: Json | null
+          id: string
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_folder_id?: string | null
+          default_project_id?: string | null
+          enabled_features?: Json | null
+          id?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_folder_id?: string | null
+          default_project_id?: string | null
+          enabled_features?: Json | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      taskade_sync_log: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_memory: {
         Row: {
           category: string
