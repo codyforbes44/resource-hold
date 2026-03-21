@@ -130,7 +130,7 @@ const ChatSidebar = ({
               ) : (
                 <span className="truncate flex-1">{c.title}</span>
               )}
-              <div className="hidden items-center gap-1 group-hover:flex">
+              <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button
                   className="text-muted-foreground hover:text-foreground min-h-[32px] min-w-[32px] flex items-center justify-center"
                   onClick={(e) => {
