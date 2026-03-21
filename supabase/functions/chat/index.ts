@@ -657,10 +657,10 @@ When you use a tool and get results, synthesize the information into a helpful r
 
       const result = await executeTool(fnName, fnArgs, userId || "");
 
-      if (result.startsWith("IMAGE_DATA:")) {
-        const imageDataUrl = result.slice(11);
+      if (result.startsWith("IMAGE_URL:")) {
+        const imageUrl = result.slice(10);
         toolStatusChunks.push(
-          `data: ${JSON.stringify({ choices: [{ delta: { content: `![Generated Image](${imageDataUrl})\n\n` } }] })}\n\n`
+          `data: ${JSON.stringify({ choices: [{ delta: { content: `![Generated Image](${imageUrl})\n\n` } }] })}\n\n`
         );
         toolMessages.push({ role: "tool", tool_call_id: tc.id, content: "Image generated successfully and displayed to the user." });
       } else {
