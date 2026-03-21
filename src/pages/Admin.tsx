@@ -312,6 +312,15 @@ const Admin = () => {
           />
         </TabsContent>
 
+        {/* Personalities Tab */}
+        <TabsContent value="personalities">
+          <PersonalitiesTab
+            personalities={personalities}
+            onAction={handleKbAction}
+            onRefresh={loadAdminData}
+          />
+        </TabsContent>
+
         {/* Conversations Tab */}
         <TabsContent value="conversations" className="space-y-4">
           <div className="flex items-center gap-2">
