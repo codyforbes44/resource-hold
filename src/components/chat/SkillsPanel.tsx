@@ -79,6 +79,15 @@ const DEFAULT_SKILLS: Skill[] = [
     badge: "Firecrawl",
     color: "hsl(190 80% 45%)",
   },
+  {
+    id: "taskade",
+    name: "Taskade",
+    description: "Create tasks, manage projects, and prompt Taskade agents directly from chat.",
+    icon: CheckSquare,
+    enabled: false,
+    badge: "Integration",
+    color: "hsl(25 90% 55%)",
+  },
 ];
 
 interface SkillsPanelProps {
