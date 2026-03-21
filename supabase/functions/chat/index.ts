@@ -214,7 +214,41 @@ async function executeImageGeneration(prompt: string): Promise<string> {
     const images = data.choices?.[0]?.message?.images;
     if (images && images.length > 0) {
       const imageUrl = images[0].image_url?.url;
-      if (imageUrl) return `IMAGE_DATA:${imageUrl}`;
+      if (imageUrl) {
+        // Upload base64 image to storage instead of returning inline
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+          const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+          // Extract base64 data
+          const base64Match = imageUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+          if (!base64Match) return `IMAGE_URL:${imageUrl}`; // fallback if not base64
+
+          const ext = base64Match[1] === "jpeg" ? "jpg" : base64Match[1];
+          const base64Data = base64Match[2];
+          const binaryData = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+
+          const filename = `${crypto.randomUUID()}.${ext}`;
+          const { error: uploadError } = await adminClient.storage
+            .from("chat_images")
+            .upload(filename, binaryData, {
+              contentType: `image/${base64Match[1]}`,
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error("Storage upload error:", uploadError);
+            return `IMAGE_URL:${imageUrl}`; // fallback to inline
+          }
+
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/chat_images/${filename}`;
+          return `IMAGE_URL:${publicUrl}`;
+        } catch (storageErr) {
+          console.error("Storage upload failed:", storageErr);
+          return `IMAGE_URL:${imageUrl}`; // fallback to inline
+        }
+      }
     }
     return data.choices?.[0]?.message?.content || "Image generation produced no result.";
   } catch (e) {
