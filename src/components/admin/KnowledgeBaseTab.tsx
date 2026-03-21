@@ -250,6 +250,9 @@ const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh 
                   {statusIcon(doc.status)}
                   <p className="font-medium text-sm truncate">{doc.filename}</p>
                   <Badge className={`text-[10px] h-5 ${statusColor(doc.status)}`}>{doc.status}</Badge>
+                  {doc.category && doc.category !== "general" && (
+                    <Badge variant="outline" className="text-[10px] h-5">{doc.category}</Badge>
+                  )}
                 </div>
                 {doc.source_url && (
                   <p className="text-xs text-muted-foreground truncate flex items-center gap-1">

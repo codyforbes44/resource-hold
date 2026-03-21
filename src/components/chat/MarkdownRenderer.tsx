@@ -262,6 +262,15 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
           // ── Images ──
           img({ src, alt, ...props }) {
             const isStorageUrl = src?.includes("/storage/v1/object/public/chat_images/");
+            const [imgError, setImgError] = useState(false);
+            if (imgError) {
+              return (
+                <div className="my-3 inline-flex items-center gap-2 rounded-lg border border-border/30 bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  <ExternalLink className="h-4 w-4" />
+                  <a href={src} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View image</a>
+                </div>
+              );
+            }
             return (
               <div className="relative group/img my-3 inline-block">
                 <a href={src} target="_blank" rel="noopener noreferrer" className="block">
@@ -270,6 +279,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
                     alt={alt || ""}
                     className="rounded-lg max-h-[32rem] w-auto border border-border/30 hover:border-border transition-colors"
                     loading="lazy"
+                    onError={() => setImgError(true)}
                     {...props}
                   />
                 </a>
