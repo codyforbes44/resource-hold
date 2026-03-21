@@ -1,27 +1,35 @@
 
 
-## Add File Upload to Admin Knowledge Base Tab
+## Fix Image Generation Capabilities
 
-### What
-Add a file upload capability to the admin KB tab so admins can upload documents (.txt, .md, .csv, .html, .json, .pdf) that get stored in Supabase Storage and indexed with embeddings — the same pipeline used by regular users, but accessible from the admin dashboard.
+### Problem
+The image generation skill generates images via the Lovable AI gateway but returns the entire base64 data URL inline in the SSE stream as markdown (`![Generated Image](data:image/png;base64,...)`). This causes two critical issues:
+
+1. **SSE parsing failure**: The base64 string (often 500KB+) arrives as a single massive JSON payload in one `data:` line. When split across TCP chunks, the frontend's `JSON.parse` fails on partial data, and the fallback logic puts the broken line back into the buffer — creating an infinite loop or dropped content.
+2. **Message storage bloat**: The entire base64 string gets stored in the `messages` table as part of the assistant's markdown content, bloating the database and slowing conversation loading.
+
+### Solution
+Store generated images in Supabase Storage and return a proper URL instead of inline base64.
 
 ### Changes
 
-#### 1. Update `src/components/admin/KnowledgeBaseTab.tsx`
-- Add a file input (hidden) with a styled "Upload File" button next to the existing "Add URL" section
-- Accept: `.txt, .md, .csv, .html, .json, .pdf` (up to 10MB)
-- On file select: upload to `knowledge_documents` storage bucket, create a document record, then trigger processing — all via a new `upload_kb_file` admin action
-- Show upload progress state (uploading/processing indicator)
+#### 1. Create `chat_images` storage bucket (migration)
+- Create a public bucket `chat_images` so generated image URLs are directly accessible
+- Add RLS policy allowing the service role to insert (edge function uses service role)
+- Add public read policy so URLs work without auth tokens
 
-#### 2. Update `supabase/functions/admin-data/index.ts`
-Add a new `upload_kb_file` action that:
-- Accepts base64-encoded file content, filename, and mime_type from the POST body
-- Uploads the file to `knowledge_documents` storage bucket under the admin's user ID
-- Creates a `knowledge_documents` record with status "pending"
-- Calls the existing `knowledge-upload` function with `action: "process"` to trigger chunking and embedding
-- Logs the action to `audit_logs`
+#### 2. Update `supabase/functions/chat/index.ts` — `executeImageGeneration`
+- After receiving the base64 image from the AI gateway, upload it to `chat_images` bucket with a unique filename (UUID + timestamp)
+- Return the public URL instead of `IMAGE_DATA:base64...`
+- The SSE stream will then contain a short markdown image like `![Generated Image](https://.../storage/v1/object/public/chat_images/...)` — small, parseable, and persistent
 
-### Files to Modify
-- `src/components/admin/KnowledgeBaseTab.tsx` — add file upload UI
-- `supabase/functions/admin-data/index.ts` — add `upload_kb_file` action
+#### 3. Update `src/components/chat/MarkdownRenderer.tsx` — `img` component
+- Handle both `data:` URLs (backward compat) and storage URLs
+- For storage URLs, render a larger preview with a download button
+- Keep the click-to-open-in-new-tab behavior
+
+### Files
+- **New migration**: create `chat_images` public storage bucket
+- `supabase/functions/chat/index.ts` — update `executeImageGeneration` to upload to storage and return URL
+- `src/components/chat/MarkdownRenderer.tsx` — improve image rendering with download action
 
