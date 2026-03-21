@@ -825,13 +825,6 @@ When you use a tool and get results, synthesize the information into a helpful r
         const councilStatus = `data: ${JSON.stringify({ choices: [{ delta: { content: "*🧠 Council deliberation complete*\n\n" } }] })}\n\n`;
         const contentChunk = `data: ${JSON.stringify({ choices: [{ delta: { content: councilResult.content } }] })}\n\ndata: [DONE]\n\n`;
 
-        // TIMP: fire-and-forget store
-        timp.storeSessionAsync(
-          parentRunId || crypto.randomUUID(),
-          lastUserMsg,
-          councilResult.content,
-          { model: backendModel, path: "council", agents: councilResult.agentsUsed },
-        );
 
         await lsPatchRun(parentRunId, {
           outputs: { path: "council", model: backendModel, agents: councilResult.agentsUsed },
