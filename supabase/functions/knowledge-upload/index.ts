@@ -147,44 +147,38 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Missing authorization");
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Support service-role calls with user_id_override for batch operations
+    // Support multiple auth methods
     let userId: string;
+    const authHeader = req.headers.get("Authorization");
+    const bodyClone = await req.clone().json();
     
-    // Check if the caller has service_role by decoding the JWT claims
-    let isServiceRole = false;
-    try {
-      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-      const checkClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
+    // Method 1: Internal call with service_role_key in body (for cron/batch)
+    if (bodyClone.service_role_key === serviceRoleKey && bodyClone.user_id_override) {
+      userId = bodyClone.user_id_override;
+      console.log("Internal service role auth, user_id_override:", userId);
+    }
+    // Method 2: Auth header with service role token
+    else if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData } = await checkClient.auth.getClaims(token);
-      if (claimsData?.claims?.role === "service_role") {
-        isServiceRole = true;
+      if (token === serviceRoleKey && bodyClone.user_id_override) {
+        userId = bodyClone.user_id_override;
+        console.log("Service role auth, user_id_override:", userId);
+      } else {
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user }, error: authError } = await userClient.auth.getUser();
+        if (authError || !user) throw new Error("Unauthorized");
+        userId = user.id;
       }
-    } catch { /* not a service role token */ }
-    
-    if (isServiceRole) {
-      const body_peek = await req.clone().json();
-      if (!body_peek.user_id_override) throw new Error("Service role calls require user_id_override");
-      userId = body_peek.user_id_override;
-      console.log("Service role auth, user_id_override:", userId);
     } else {
-      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-      const userClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user }, error: authError } = await userClient.auth.getUser();
-      if (authError || !user) throw new Error("Unauthorized");
-      userId = user.id;
+      throw new Error("Missing authorization");
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
