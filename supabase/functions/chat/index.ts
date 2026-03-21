@@ -228,9 +228,59 @@ const SKILL_TOOLS: Record<string, any> = {
       },
     },
   },
+  taskade_create_task: {
+    type: "function",
+    function: {
+      name: "taskade_create_task",
+      description: "Create a task in the user's default Taskade project.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "The task title" },
+          description: { type: "string", description: "Optional task description" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  taskade_list_tasks: {
+    type: "function",
+    function: {
+      name: "taskade_list_tasks",
+      description: "List tasks from the user's default Taskade project.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  taskade_create_project: {
+    type: "function",
+    function: {
+      name: "taskade_create_project",
+      description: "Create a new Taskade project.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "The project title" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  taskade_prompt_agent: {
+    type: "function",
+    function: {
+      name: "taskade_prompt_agent",
+      description: "Prompt a Taskade agent with a question or instruction.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "The prompt message for the agent" },
+          agent_id: { type: "string", description: "The agent ID to prompt" },
+        },
+        required: ["message"],
+      },
+    },
+  },
 };
-
-// ── Tool executors ──
 
 async function executeWebSearch(query: string): Promise<string> {
   const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
