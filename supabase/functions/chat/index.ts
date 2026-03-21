@@ -514,6 +514,74 @@ async function executeBrowsePage(url: string): Promise<string> {
   }
 }
 
+// ── Taskade tool executors ──
+
+const TASKADE_BASE = "https://www.taskade.com/api/v1";
+
+async function taskadeApiCall(path: string, method: string = "GET", body?: unknown): Promise<any> {
+  const apiKey = Deno.env.get("TASKADE_API_KEY");
+  if (!apiKey) return { error: "Taskade API key not configured" };
+  const resp = await fetch(`${TASKADE_BASE}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return resp.json().catch(() => ({}));
+}
+
+async function executeTaskadeCreateTask(title: string, description: string, userId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const client = createClient(supabaseUrl, serviceRoleKey);
+    const { data: config } = await client.from("taskade_configs").select("default_project_id").eq("user_id", userId).single();
+    const projectId = config?.default_project_id;
+    if (!projectId) return "No default Taskade project configured. Ask the user to set one in Admin → Taskade.";
+    const result = await taskadeApiCall(`/projects/${projectId}/tasks`, "POST", { title, description });
+    if (result?.error) return `Failed to create task: ${result.error}`;
+    return `Task created: "${title}"${description ? ` — ${description}` : ""}`;
+  } catch (e) {
+    return `Taskade error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeTaskadeListTasks(userId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const client = createClient(supabaseUrl, serviceRoleKey);
+    const { data: config } = await client.from("taskade_configs").select("default_project_id").eq("user_id", userId).single();
+    const projectId = config?.default_project_id;
+    if (!projectId) return "No default Taskade project configured.";
+    const result = await taskadeApiCall(`/projects/${projectId}/tasks`);
+    const tasks = result?.items || result?.tasks || [];
+    if (tasks.length === 0) return "No tasks found in the default project.";
+    return tasks.map((t: any, i: number) => `${i + 1}. ${t.completed ? "✅" : "⬜"} ${t.title}`).join("\n");
+  } catch (e) {
+    return `Taskade error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeTaskadeCreateProject(title: string): Promise<string> {
+  try {
+    const result = await taskadeApiCall("/projects", "POST", { title });
+    if (result?.error) return `Failed to create project: ${result.error}`;
+    return `Taskade project "${title}" created successfully.${result?.id ? ` ID: ${result.id}` : ""}`;
+  } catch (e) {
+    return `Taskade error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
+async function executeTaskadePromptAgent(agentId: string, message: string): Promise<string> {
+  try {
+    if (!agentId) return "No agent_id provided. The user needs to specify which Taskade agent to prompt.";
+    const result = await taskadeApiCall(`/agents/${agentId}/conversations`, "POST", { message });
+    return result?.response || result?.message?.content || JSON.stringify(result);
+  } catch (e) {
+    return `Taskade agent error: ${e instanceof Error ? e.message : "Unknown"}`;
+  }
+}
+
 async function executeTool(name: string, args: Record<string, any>, userId: string): Promise<string> {
   switch (name) {
     case "web_search": return await executeWebSearch(args.query);
@@ -523,6 +591,10 @@ async function executeTool(name: string, args: Record<string, any>, userId: stri
     case "store_memory": return await executeStoreMemory(args.key, args.value, args.category, userId);
     case "recall_memory": return await executeRecallMemory(args.category, userId);
     case "browse_page": return await executeBrowsePage(args.url);
+    case "taskade_create_task": return await executeTaskadeCreateTask(args.title, args.description || "", userId);
+    case "taskade_list_tasks": return await executeTaskadeListTasks(userId);
+    case "taskade_create_project": return await executeTaskadeCreateProject(args.title);
+    case "taskade_prompt_agent": return await executeTaskadePromptAgent(args.agent_id, args.message);
     default: return `Unknown tool: ${name}`;
   }
 }
