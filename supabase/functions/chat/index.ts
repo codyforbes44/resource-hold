@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { TIMPClient } from "./timp-client.ts";
 import { routeQuery, runCouncil, type CouncilResult } from "./agent-council.ts";
 
 const corsHeaders = {
