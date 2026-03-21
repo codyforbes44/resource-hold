@@ -12,6 +12,68 @@ const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
 
+// ── LangSmith Observability ──
+
+const LANGSMITH_API = "https://api.smith.langchain.com";
+const LANGSMITH_PROJECT = Deno.env.get("LANGSMITH_PROJECT") || "gclaw-chat";
+
+function getLangChainKey(): string | null {
+  return Deno.env.get("LANGCHAIN_API_KEY") || null;
+}
+
+async function lsCreateRun(params: {
+  name: string;
+  run_type: "chain" | "llm" | "tool";
+  inputs: Record<string, any>;
+  parent_run_id?: string;
+  extra?: Record<string, any>;
+}): Promise<string | null> {
+  const apiKey = getLangChainKey();
+  if (!apiKey) return null;
+  const runId = crypto.randomUUID();
+  try {
+    await fetch(`${LANGSMITH_API}/runs`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: runId,
+        name: params.name,
+        run_type: params.run_type,
+        inputs: params.inputs,
+        start_time: new Date().toISOString(),
+        session_name: LANGSMITH_PROJECT,
+        parent_run_id: params.parent_run_id,
+        extra: params.extra,
+      }),
+    });
+  } catch (e) {
+    console.warn("LangSmith createRun failed:", e);
+  }
+  return runId;
+}
+
+async function lsPatchRun(runId: string | null, patch: {
+  outputs?: Record<string, any>;
+  error?: string;
+  extra?: Record<string, any>;
+}): Promise<void> {
+  if (!runId) return;
+  const apiKey = getLangChainKey();
+  if (!apiKey) return;
+  try {
+    await fetch(`${LANGSMITH_API}/runs/${runId}`, {
+      method: "PATCH",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        end_time: new Date().toISOString(),
+        ...patch,
+      }),
+    });
+  } catch (e) {
+    console.warn("LangSmith patchRun failed:", e);
+  }
+}
+
 // ── Tier → Backend Model Routing ──
 
 const TIER_MODEL_MAP: Record<string, string> = {
