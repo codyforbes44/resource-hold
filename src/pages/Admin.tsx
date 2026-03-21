@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import {
   Users, MessageSquare, ClipboardList, BarChart3, Search,
   Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen, Sparkles,
-  ExternalLink, Activity,
+  ExternalLink, Activity, CheckSquare,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
