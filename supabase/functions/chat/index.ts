@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { TIMPClient } from "./timp-client.ts";
+import { routeQuery, runCouncil, type CouncilResult } from "./agent-council.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -710,6 +712,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Initialize TIMP client (no-op if not configured)
+    const timp = new TIMPClient();
+
     // Build tools array
     const tools: any[] = [];
     for (const skillId of enabledSkills) {
@@ -758,7 +763,101 @@ ${enabledSkills.includes("browser") ? "\nYou can browse specific web pages to ex
 
 When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.${memoryContext}`;
 
-    const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
+    // ── TIMP: Fetch historical context ──
+    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content || "";
+    let timpContext = "";
+    if (timp.isConfigured && lastUserMsg) {
+      try {
+        timpContext = await timp.getHistoricalContext(lastUserMsg, 3);
+        if (timpContext) {
+          console.log("TIMP: Found historical context");
+        }
+      } catch (e) {
+        console.warn("TIMP context fetch failed:", e);
+      }
+    }
+
+    const finalSystemPrompt = systemPrompt + timpContext;
+    const fullMessages = [{ role: "system", content: finalSystemPrompt }, ...messages];
+
+    // ── Agent Council routing ──
+    const councilDecision = routeQuery(lastUserMsg, enabledSkills);
+    console.log(`Council decision: ${councilDecision.reason} (useCouncil: ${councilDecision.useCouncil})`);
+
+    // ── Council path: multi-agent deliberation ──
+    if (councilDecision.useCouncil && tools.length === 0) {
+      const councilRunId = await lsCreateRun({
+        name: "agent-council",
+        run_type: "chain",
+        inputs: {
+          agents: councilDecision.agents.map((a) => a.id),
+          reason: councilDecision.reason,
+          user_message: lastUserMsg.slice(0, 200),
+        },
+        parent_run_id: parentRunId || undefined,
+        extra: { metadata: { timp_context: !!timpContext } },
+      });
+
+      const conversationContext = messages
+        .slice(-6)
+        .map((m: any) => `${m.role}: ${m.content.slice(0, 300)}`)
+        .join("\n");
+
+      const councilResult = await runCouncil(
+        councilDecision.agents,
+        lastUserMsg,
+        conversationContext + (timpContext || ""),
+        finalSystemPrompt,
+        LOVABLE_API_KEY,
+        backendModel,
+      );
+
+      // Trace each agent as a child run
+      for (const ar of councilResult.agentResults) {
+        const agentRunId = await lsCreateRun({
+          name: `agent:${ar.agentName}`,
+          run_type: "llm",
+          inputs: { agent_id: ar.agentId, user_message: lastUserMsg.slice(0, 200) },
+          parent_run_id: councilRunId || undefined,
+          extra: { metadata: { latency_ms: ar.latencyMs } },
+        });
+        await lsPatchRun(agentRunId, {
+          outputs: { output: ar.output.slice(0, 500) },
+          error: ar.error,
+        });
+      }
+
+      await lsPatchRun(councilRunId, {
+        outputs: {
+          agents_used: councilResult.agentsUsed,
+          total_latency_ms: councilResult.totalLatencyMs,
+          merged: councilResult.merged,
+        },
+      });
+
+      if (councilResult.content) {
+        // Stream the council result as SSE
+        const councilStatus = `data: ${JSON.stringify({ choices: [{ delta: { content: "*🧠 Council deliberation complete*\n\n" } }] })}\n\n`;
+        const contentChunk = `data: ${JSON.stringify({ choices: [{ delta: { content: councilResult.content } }] })}\n\ndata: [DONE]\n\n`;
+
+        // TIMP: fire-and-forget store
+        timp.storeSessionAsync(
+          parentRunId || crypto.randomUUID(),
+          lastUserMsg,
+          councilResult.content,
+          { model: backendModel, path: "council", agents: councilResult.agentsUsed },
+        );
+
+        await lsPatchRun(parentRunId, {
+          outputs: { path: "council", model: backendModel, agents: councilResult.agentsUsed },
+        });
+
+        return new Response(councilStatus + contentChunk, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+      // If council produced nothing, fall through to direct path
+    }
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
@@ -790,7 +889,15 @@ When you use a tool and get results, synthesize the information into a helpful r
 
       // Fire-and-forget: patch LLM + parent as complete (we can't easily count streamed tokens)
       lsPatchRun(llmRunId, { outputs: { streamed: true } });
-      lsPatchRun(parentRunId, { outputs: { path: "no-tools-stream", model: backendModel } });
+      lsPatchRun(parentRunId, { outputs: { path: "no-tools-stream", model: backendModel, council_decision: councilDecision.reason } });
+
+      // TIMP: fire-and-forget (we can't capture streamed content, but log the interaction)
+      timp.storeSessionAsync(
+        parentRunId || crypto.randomUUID(),
+        lastUserMsg,
+        "[streamed response]",
+        { model: backendModel, path: "no-tools-stream" },
+      );
 
       return new Response(response.body, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
@@ -958,7 +1065,15 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     lsPatchRun(finalLlmRunId, { outputs: { streamed: true } });
-    lsPatchRun(parentRunId, { outputs: { path: "tools-executed", model: backendModel, tools_used: selectedTools } });
+    lsPatchRun(parentRunId, { outputs: { path: "tools-executed", model: backendModel, tools_used: selectedTools, council_decision: councilDecision.reason } });
+
+    // TIMP: fire-and-forget
+    timp.storeSessionAsync(
+      parentRunId || crypto.randomUUID(),
+      lastUserMsg,
+      "[streamed tool response]",
+      { model: backendModel, path: "tools-executed", tools: selectedTools },
+    );
 
     const encoder = new TextEncoder();
     const statusData = toolStatusChunks.join("");
