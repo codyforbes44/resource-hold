@@ -190,9 +190,6 @@ const Admin = () => {
           <TabsTrigger value="audit" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <ClipboardList className="h-4 w-4 hidden sm:block" /> Audit
           </TabsTrigger>
-          <TabsTrigger value="taskade" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
-            <CheckSquare className="h-4 w-4 hidden sm:block" /> Taskade
-          </TabsTrigger>
           <TabsTrigger value="system" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <BarChart3 className="h-4 w-4 hidden sm:block" /> System
           </TabsTrigger>
