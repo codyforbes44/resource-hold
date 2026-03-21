@@ -49,6 +49,7 @@ export type Database = {
           created_at: string
           id: string
           model: string
+          personality_id: string | null
           title: string
           updated_at: string
           user_id: string
@@ -57,6 +58,7 @@ export type Database = {
           created_at?: string
           id?: string
           model?: string
+          personality_id?: string | null
           title?: string
           updated_at?: string
           user_id: string
@@ -65,11 +67,20 @@ export type Database = {
           created_at?: string
           id?: string
           model?: string
+          personality_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversations_personality_id_fkey"
+            columns: ["personality_id"]
+            isOneToOne: false
+            referencedRelation: "personalities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       knowledge_chunks: {
         Row: {
@@ -111,6 +122,7 @@ export type Database = {
       }
       knowledge_documents: {
         Row: {
+          category: string | null
           chunk_count: number
           created_at: string
           error_message: string | null
@@ -125,6 +137,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           chunk_count?: number
           created_at?: string
           error_message?: string | null
@@ -139,6 +152,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           chunk_count?: number
           created_at?: string
           error_message?: string | null
@@ -228,6 +242,48 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+        }
+        Relationships: []
+      }
+      personalities: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string
+          icon: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          slug: string
+          sort_order: number | null
+          system_prompt_modifier: string
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          slug: string
+          sort_order?: number | null
+          system_prompt_modifier?: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          slug?: string
+          sort_order?: number | null
+          system_prompt_modifier?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
