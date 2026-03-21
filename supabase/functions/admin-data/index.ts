@@ -208,7 +208,7 @@ serve(async (req) => {
     }
 
     // GET: Fetch admin dashboard data
-    const [profilesRes, conversationsRes, auditRes, userCountRes, convCountRes, msgCountRes, modelDefaultsRes, userOverridesRes, kbDocsRes, kbChunkCountRes, kbPendingRes, kbErrorRes] =
+    const [profilesRes, conversationsRes, auditRes, userCountRes, convCountRes, msgCountRes, modelDefaultsRes, userOverridesRes, kbDocsRes, kbChunkCountRes, kbPendingRes, kbErrorRes, personalitiesRes] =
       await Promise.all([
         adminClient.from("profiles").select("*").order("created_at", { ascending: false }).limit(100),
         adminClient.from("conversations").select("*, messages(count)").order("updated_at", { ascending: false }).limit(100),
@@ -222,6 +222,7 @@ serve(async (req) => {
         adminClient.from("knowledge_chunks").select("*", { count: "exact", head: true }),
         adminClient.from("knowledge_documents").select("*", { count: "exact", head: true }).eq("status", "processing"),
         adminClient.from("knowledge_documents").select("*", { count: "exact", head: true }).eq("status", "error"),
+        adminClient.from("personalities").select("*").order("sort_order"),
       ]);
 
     const conversations = (conversationsRes.data || []).map((c: any) => ({
