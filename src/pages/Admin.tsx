@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import AppShell from "@/components/AppShell";
 import KnowledgeBaseTab from "@/components/admin/KnowledgeBaseTab";
-import TaskadeTab from "@/components/admin/TaskadeTab";
+
 import PersonalitiesTab from "@/components/admin/PersonalitiesTab";
 import { toast } from "sonner";
 import {
