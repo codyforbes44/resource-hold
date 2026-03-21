@@ -784,6 +784,81 @@ When you use a tool and get results, synthesize the information into a helpful r
     const councilDecision = routeQuery(lastUserMsg, enabledSkills);
     console.log(`Council decision: ${councilDecision.reason} (useCouncil: ${councilDecision.useCouncil})`);
 
+    // ── Council path: multi-agent deliberation ──
+    if (councilDecision.useCouncil && tools.length === 0) {
+      const councilRunId = await lsCreateRun({
+        name: "agent-council",
+        run_type: "chain",
+        inputs: {
+          agents: councilDecision.agents.map((a) => a.id),
+          reason: councilDecision.reason,
+          user_message: lastUserMsg.slice(0, 200),
+        },
+        parent_run_id: parentRunId || undefined,
+        extra: { metadata: { timp_context: !!timpContext } },
+      });
+
+      const conversationContext = messages
+        .slice(-6)
+        .map((m: any) => `${m.role}: ${m.content.slice(0, 300)}`)
+        .join("\n");
+
+      const councilResult = await runCouncil(
+        councilDecision.agents,
+        lastUserMsg,
+        conversationContext + (timpContext || ""),
+        finalSystemPrompt,
+        LOVABLE_API_KEY,
+        backendModel,
+      );
+
+      // Trace each agent as a child run
+      for (const ar of councilResult.agentResults) {
+        const agentRunId = await lsCreateRun({
+          name: `agent:${ar.agentName}`,
+          run_type: "llm",
+          inputs: { agent_id: ar.agentId, user_message: lastUserMsg.slice(0, 200) },
+          parent_run_id: councilRunId || undefined,
+          extra: { metadata: { latency_ms: ar.latencyMs } },
+        });
+        await lsPatchRun(agentRunId, {
+          outputs: { output: ar.output.slice(0, 500) },
+          error: ar.error,
+        });
+      }
+
+      await lsPatchRun(councilRunId, {
+        outputs: {
+          agents_used: councilResult.agentsUsed,
+          total_latency_ms: councilResult.totalLatencyMs,
+          merged: councilResult.merged,
+        },
+      });
+
+      if (councilResult.content) {
+        // Stream the council result as SSE
+        const councilStatus = `data: ${JSON.stringify({ choices: [{ delta: { content: "*🧠 Council deliberation complete*\n\n" } }] })}\n\n`;
+        const contentChunk = `data: ${JSON.stringify({ choices: [{ delta: { content: councilResult.content } }] })}\n\ndata: [DONE]\n\n`;
+
+        // TIMP: fire-and-forget store
+        timp.storeSessionAsync(
+          parentRunId || crypto.randomUUID(),
+          lastUserMsg,
+          councilResult.content,
+          { model: backendModel, path: "council", agents: councilResult.agentsUsed },
+        );
+
+        await lsPatchRun(parentRunId, {
+          outputs: { path: "council", model: backendModel, agents: councilResult.agentsUsed },
+        });
+
+        return new Response(councilStatus + contentChunk, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+      // If council produced nothing, fall through to direct path
+    }
+
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
       const llmRunId = await lsCreateRun({
