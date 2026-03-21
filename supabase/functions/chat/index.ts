@@ -736,10 +736,13 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     const choice = initialData.choices?.[0];
+    const selectedTools = choice?.message?.tool_calls?.map((tc: any) => tc.function?.name) || [];
+    lsPatchRun(toolLlmRunId, { outputs: { tool_calls: selectedTools, has_content: !!choice?.message?.content } });
 
     if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
       const content = choice?.message?.content || "";
       const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+      lsPatchRun(parentRunId, { outputs: { path: "tools-no-call", model: backendModel } });
       return new Response(sseData, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
       });
