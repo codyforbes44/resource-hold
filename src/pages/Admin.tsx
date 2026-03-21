@@ -16,7 +16,7 @@ import PersonalitiesTab from "@/components/admin/PersonalitiesTab";
 import { toast } from "sonner";
 import {
   Users, MessageSquare, ClipboardList, BarChart3, Search,
-  Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen,
+  Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen, Sparkles,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
