@@ -605,12 +605,6 @@ serve(async (req) => {
     if (enabledSkills.includes("memory") && SKILL_TOOLS["memory_recall"]) {
       tools.push(SKILL_TOOLS["memory_recall"]);
     }
-    // Taskade skill adds multiple tools
-    if (enabledSkills.includes("taskade")) {
-      for (const key of ["taskade_create_task", "taskade_list_tasks", "taskade_create_project", "taskade_prompt_agent"]) {
-        if (SKILL_TOOLS[key]) tools.push(SKILL_TOOLS[key]);
-      }
-    }
 
     // Build memory context
     let memoryContext = "";
