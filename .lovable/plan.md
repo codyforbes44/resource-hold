@@ -1,115 +1,29 @@
 
 
-## Agent Council + LangChain + TIMP Orchestration
+## Refactor TIMP: External Service → Knowledge Base Reference
 
-### Current State
+### What's Wrong
 
-- **Single-agent architecture**: One LLM call with optional tool use, no multi-agent deliberation
-- **LangSmith**: REST-based observability tracing (fire-and-forget), not LangChain SDK
-- **TIMP**: Documentation exists in the knowledge base as reference text, but no live integration with a TIMP service instance
-- **No Agent Council pattern**: All requests go through one model with one system prompt
+The codebase treats TIMP as a **live external API service** with an HTTP client (`timp-client.ts`) that calls `TIMP_BASE_URL/sessions`, `TIMP_BASE_URL/search`, etc. But TIMP is actually a **proprietary knowledge base document** — a `.txt` file already ingested into the RAG system (3 chunks, status: ready). There is no live TIMP service to call.
 
-### What Needs to Change
+### What Changes
 
-The "Agent Council" pattern requires multiple specialized agents that deliberate before producing a final response. LangChain provides the orchestration framework, and TIMP provides temporal session memory and semantic search across historical interactions.
+1. **Delete `supabase/functions/chat/timp-client.ts`** — the entire external HTTP client is unnecessary
+2. **Update `supabase/functions/chat/index.ts`** — remove all TIMP client imports, initialization, context fetching, and fire-and-forget session storage calls. The existing `search_knowledge` tool already surfaces TIMP documentation when users ask about it via RAG.
+3. **Update `supabase/functions/chat/agent-council.ts`** — remove any MemoryAgent references to TIMP historical search; the MemoryAgent still handles user memory recall via the existing `user_memory` table
 
-### Architecture
+### What Stays the Same
 
-```text
-User Message
-     │
-     ▼
-┌─────────────────────────────────┐
-│        Agent Council Router     │  ← Determines which agents to consult
-│   (LangChain AgentExecutor)     │
-└──────────┬──────────────────────┘
-           │
-     ┌─────┼─────┬─────────┐
-     ▼     ▼     ▼         ▼
-  ┌─────┐ ┌────┐ ┌──────┐ ┌──────────┐
-  │Coder│ │Res.│ │Memory│ │Taskade   │
-  │Agent│ │Agt.│ │Agent │ │Agent     │
-  └──┬──┘ └─┬──┘ └──┬───┘ └────┬─────┘
-     │      │       │           │
-     └──────┴───┬───┴───────────┘
-                ▼
-     ┌──────────────────┐
-     │  Council Merger   │  ← Synthesizes agent outputs
-     │  (Final LLM call) │
-     └────────┬─────────┘
-              │
-              ▼
-     ┌──────────────────┐
-     │  TIMP Session     │  ← Stores interaction for future retrieval
-     │  (Post-response)  │
-     └──────────────────┘
-              │
-              ▼
-     ┌──────────────────┐
-     │  LangSmith Trace  │  ← Full chain traced
-     └──────────────────┘
-```
+- **Agent Council** — fully intact, no changes to routing/merger logic
+- **LangSmith tracing** — unchanged
+- **Knowledge Base RAG** — TIMP docs are already indexed and retrievable via the `search_knowledge` tool
+- **MemoryAgent** — still works for user preference/context recall, just without TIMP API calls
 
-### Implementation Plan
+### Files
 
-#### Phase 1: TIMP Client Integration (Edge Function)
+| File | Action |
+|------|--------|
+| `supabase/functions/chat/timp-client.ts` | **Delete** |
+| `supabase/functions/chat/index.ts` | Remove TIMP import, initialization, context fetch, and 3 `storeSessionAsync` calls |
+| `.lovable/plan.md` | Update to reflect TIMP as knowledge base content, not external service |
 
-**File: `supabase/functions/chat/timp-client.ts`** (new)
-
-- `TIMPClient` class with configurable base URL (`TIMP_BASE_URL` secret)
-- Methods: `createSession()`, `searchSessions()`, `getSession()`, `getStats()`
-- Authentication via `TIMP_API_KEY` secret
-- Fire-and-forget session storage after each interaction (non-blocking)
-- Semantic search before agent deliberation to pull relevant historical context
-
-**Required secrets**: `TIMP_BASE_URL`, `TIMP_API_KEY`
-- Graceful no-op if not configured (like current LangSmith pattern)
-
-#### Phase 2: Agent Council Framework (Edge Function)
-
-**File: `supabase/functions/chat/agent-council.ts`** (new)
-
-Lightweight council pattern (no heavy LangChain SDK — Deno edge functions can't run full LangChain):
-
-- **`CouncilRouter`** — Analyzes the user message to determine which specialist agents to invoke
-  - Simple messages (greetings, quick facts) → skip council, direct response
-  - Complex messages → fan out to 2-3 relevant agents in parallel
-- **Specialist Agents** (each is a separate LLM call with a focused system prompt):
-  - `CodeAgent` — programming, debugging, architecture
-  - `ResearchAgent` — web search, deep research, knowledge base
-  - `MemoryAgent` — recall/store user context, TIMP historical search
-  - `TaskAgent` — Taskade operations, project management
-  - `CreativeAgent` — image generation, writing, brainstorming
-- **`CouncilMerger`** — Takes specialist outputs and synthesizes a final coherent response via one LLM call
-- Each agent call is a separate LangSmith child run for full observability
-
-#### Phase 3: Update Main Chat Handler
-
-**File: `supabase/functions/chat/index.ts`** (modify)
-
-- Import `AgentCouncil` and `TIMPClient`
-- Before processing: query TIMP for relevant historical sessions (adds context to system prompt)
-- Replace single-LLM flow with council orchestration when complexity threshold is met
-- After response: store session in TIMP (fire-and-forget)
-- All council steps traced as LangSmith child runs under the parent chain
-
-**Decision logic for council activation:**
-```text
-if (enabledSkills.length === 0 && messageIsSimple) → direct stream (current behavior)
-if (enabledSkills.length > 0 || messageIsComplex) → Agent Council
-```
-
-#### Phase 4: LangChain-Style Tracing Enhancement
-
-**File: `supabase/functions/chat/index.ts`** (modify existing LangSmith code)
-
-- Add `run_type: "chain"` metadata with council agent names
-- Tag each specialist agent run with its role
-- Include TIMP search latency and results count in trace metadata
-- Add token usage tracking from response headers where available
-
-#### Phase 5: Frontend — Council Indicator
-
-**File: `src/components/chat/ChatMessages.tsx`** (minor update)
-
-- When streaming
