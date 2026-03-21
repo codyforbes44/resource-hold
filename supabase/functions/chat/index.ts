@@ -670,6 +670,14 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // ── With tools: non-streaming first ──
+    const toolLlmRunId = await lsCreateRun({
+      name: `llm:${backendModel}:tool-selection`,
+      run_type: "llm",
+      inputs: { messages: fullMessages.map((m: any) => ({ role: m.role, content: m.content?.slice(0, 200) })), tools_count: tools.length },
+      parent_run_id: parentRunId || undefined,
+      extra: { metadata: { model: backendModel, stream: false } },
+    });
+
     const initialResponse = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -680,6 +688,8 @@ When you use a tool and get results, synthesize the information into a helpful r
       const status = initialResponse.status;
       const t = await initialResponse.text();
       console.error("API error:", status, t);
+      lsPatchRun(toolLlmRunId, { error: `HTTP ${status}` });
+      lsPatchRun(parentRunId, { error: `Tool LLM error: ${status}` });
       return errorResponse(
         status,
         status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required. Please add credits." : "AI error"
