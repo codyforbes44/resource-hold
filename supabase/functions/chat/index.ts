@@ -858,10 +858,6 @@ When you use a tool and get results, synthesize the information into a helpful r
         : fnName === "store_memory" ? "🧠 Saving to memory..."
         : fnName === "recall_memory" ? "🧠 Recalling memories..."
         : fnName === "browse_page" ? "🌐 Browsing page..."
-        : fnName === "taskade_create_task" ? "📋 Creating Taskade task..."
-        : fnName === "taskade_list_tasks" ? "📋 Fetching Taskade tasks..."
-        : fnName === "taskade_create_project" ? "📁 Creating Taskade project..."
-        : fnName === "taskade_prompt_agent" ? "🤖 Prompting Taskade agent..."
         : `⚡ Running ${fnName}...`;
       toolStatusChunks.push(
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`

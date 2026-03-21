@@ -8,6 +8,7 @@
 - **LangSmith**: REST-based observability tracing with full chain/agent/tool hierarchy
 - **TIMP**: Proprietary knowledge base document indexed via RAG (3 chunks in `knowledge_documents`). Surfaced automatically via the `search_knowledge` tool when users ask about it. No external TIMP service — no HTTP client needed.
 - **Knowledge Base RAG**: Handles all document retrieval including TIMP documentation
+- **Taskade**: Backend integration preserved but fully removed from user-facing surfaces (no skills panel entry, no admin tab, no chat tools)
 
 ### Architecture
 
@@ -23,7 +24,7 @@ User Message
      ┌─────┼─────┬─────────┐
      ▼     ▼     ▼         ▼
   ┌─────┐ ┌────┐ ┌──────┐ ┌──────────┐
-  │Coder│ │Res.│ │Memory│ │Taskade   │
+  │Coder│ │Res.│ │Memory│ │Creative  │
   │Agent│ │Agt.│ │Agent │ │Agent     │
   └──┬──┘ └─┬──┘ └──┬───┘ └────┬─────┘
      │      │       │           │
@@ -50,3 +51,10 @@ User Message
 ### TIMP as Knowledge Base
 
 TIMP documentation is stored as a knowledge base document (`.txt` file, 3 chunks, status: ready). When users ask about TIMP, the `search_knowledge` tool retrieves relevant chunks via vector similarity search. No external TIMP API service exists or is needed.
+
+### Taskade (Hidden from Users)
+
+Backend infrastructure (`supabase/functions/taskade/`, `taskade_configs`, `taskade_sync_log`) is preserved but all user-facing entry points have been removed:
+- No skills panel entry
+- No admin dashboard tab
+- No chat tool definitions or executors
