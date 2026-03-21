@@ -535,6 +535,21 @@ serve(async (req) => {
     const selectedTier = validateTier(body.model || "gclaw/default");
     const backendModel = resolveModel(selectedTier);
 
+    // Create parent LangSmith trace
+    parentRunId = await lsCreateRun({
+      name: "chat",
+      run_type: "chain",
+      inputs: {
+        model: selectedTier,
+        backend_model: backendModel,
+        message_count: messages.length,
+        last_user_message: messages.filter((m: any) => m.role === "user").pop()?.content?.slice(0, 200) || "",
+        skills: body.skills || [],
+        personality_id: body.personality_id || null,
+      },
+      extra: { metadata: { user_id: userId || "anonymous" } },
+    });
+
     // ── Model access enforcement ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
