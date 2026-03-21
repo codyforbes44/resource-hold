@@ -510,6 +510,9 @@ function errorResponse(status: number, message: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Start parent LangSmith trace
+  let parentRunId: string | null = null;
+
   try {
     const body = await req.json();
 
