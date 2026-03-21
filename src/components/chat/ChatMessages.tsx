@@ -91,16 +91,34 @@ const ChatMessages = ({
       <ScrollArea className="flex-1 p-3 md:p-4">
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-center px-4">
-            <img src={logoSrc} alt="gClaw" className="h-16 w-16 opacity-30" />
-            <p className="text-lg text-muted-foreground">Start a conversation with gClaw</p>
-            <p className="max-w-md text-sm text-muted-foreground/60">
-              Choose a model above and type a message below. Enable skills via the{" "}
-              <Sparkles className="inline h-3.5 w-3.5" /> button.
-            </p>
-            {isGuest && (
-              <p className="text-xs text-muted-foreground/50">
-                <Link to="/auth" className="text-primary hover:underline">Sign in</Link> to save conversations across sessions.
-              </p>
+            {isGuest ? (
+              <div className="w-full max-w-md space-y-4">
+                <div className="rounded-2xl border border-primary/15 bg-gradient-to-b from-primary/5 to-transparent p-6 space-y-3">
+                  <img src={logoSrc} alt="gClaw" className="mx-auto h-12 w-12" />
+                  <h2 className="font-display text-xl font-bold text-foreground">
+                    Welcome to gClaw
+                  </h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Your AI-powered assistant with web search, code generation, image creation, and more — no account needed.
+                  </p>
+                  <Link
+                    to="/auth"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <LogIn className="h-3 w-3" />
+                    Sign in to save &amp; sync chats
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                <img src={logoSrc} alt="gClaw" className="h-16 w-16 opacity-30" />
+                <p className="text-lg text-muted-foreground">Start a conversation with gClaw</p>
+                <p className="max-w-md text-sm text-muted-foreground/60">
+                  Choose a model above and type a message below. Enable skills via the{" "}
+                  <Sparkles className="inline h-3.5 w-3.5" /> button.
+                </p>
+              </>
             )}
             <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-lg">
               {SUGGESTED_PROMPTS.map((prompt) => (
