@@ -213,18 +213,31 @@ const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh 
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 min-h-[44px]" />
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 min-h-[44px]" />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {["all", "ready", "processing", "error", "pending"].map((s) => (
+              <Button key={s} variant={statusFilter === s ? "default" : "outline"} size="sm" onClick={() => setStatusFilter(s)} className="min-h-[36px] text-xs capitalize">
+                {s}
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {["all", "ready", "processing", "error", "pending"].map((s) => (
-            <Button key={s} variant={statusFilter === s ? "default" : "outline"} size="sm" onClick={() => setStatusFilter(s)} className="min-h-[36px] text-xs capitalize">
-              {s}
-            </Button>
-          ))}
-        </div>
+        {categories.length > 1 && (
+          <div className="flex gap-1 flex-wrap">
+            <span className="text-xs text-muted-foreground self-center mr-1">Category:</span>
+            <Button variant={categoryFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setCategoryFilter("all")} className="min-h-[32px] text-xs h-7">All</Button>
+            {categories.map((c) => (
+              <Button key={c} variant={categoryFilter === c ? "default" : "outline"} size="sm" onClick={() => setCategoryFilter(c)} className="min-h-[32px] text-xs h-7 capitalize">
+                {c}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Document list */}
