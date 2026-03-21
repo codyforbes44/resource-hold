@@ -778,7 +778,17 @@ When you use a tool and get results, synthesize the information into a helpful r
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
       );
 
+      // Trace tool execution
+      const toolTraceId = await lsCreateRun({
+        name: `tool:${fnName}`,
+        run_type: "tool",
+        inputs: fnArgs,
+        parent_run_id: parentRunId || undefined,
+      });
+
       const result = await executeTool(fnName, fnArgs, userId || "");
+
+      lsPatchRun(toolTraceId, { outputs: { result: result.slice(0, 500) } });
 
       if (result.startsWith("IMAGE_URL:")) {
         const imageUrl = result.slice(10);
