@@ -481,10 +481,6 @@ async function executeTool(name: string, args: Record<string, any>, userId: stri
     case "store_memory": return await executeStoreMemory(args.key, args.value, args.category, userId);
     case "recall_memory": return await executeRecallMemory(args.category, userId);
     case "browse_page": return await executeBrowsePage(args.url);
-    case "taskade_create_task": return await executeTaskadeCreateTask(args.title, args.description || "", userId);
-    case "taskade_list_tasks": return await executeTaskadeListTasks(userId);
-    case "taskade_create_project": return await executeTaskadeCreateProject(args.title);
-    case "taskade_prompt_agent": return await executeTaskadePromptAgent(args.agent_id, args.message);
     default: return `Unknown tool: ${name}`;
   }
 }
