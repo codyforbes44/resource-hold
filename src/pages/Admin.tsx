@@ -12,10 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import AppShell from "@/components/AppShell";
 import KnowledgeBaseTab from "@/components/admin/KnowledgeBaseTab";
+import PersonalitiesTab from "@/components/admin/PersonalitiesTab";
 import { toast } from "sonner";
 import {
   Users, MessageSquare, ClipboardList, BarChart3, Search,
-  Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen,
+  Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen, Sparkles,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -29,7 +30,6 @@ type UserModelOverride = { user_id: string; model: string; enabled: boolean };
 const PROVIDER_CONFIG: Record<string, { color: string; label: string }> = {
   google: { color: "hsl(var(--primary))", label: "Google" },
   openai: { color: "hsl(142 71% 45%)", label: "OpenAI" },
-  zephel: { color: "hsl(270 70% 60%)", label: "Zephel" },
 };
 
 function getProvider(model: string) {
@@ -60,6 +60,7 @@ const Admin = () => {
   const [togglingModel, setTogglingModel] = useState<string | null>(null);
   const [kbDocs, setKbDocs] = useState<any[]>([]);
   const [kbStats, setKbStats] = useState({ totalDocs: 0, totalChunks: 0, pendingDocs: 0, errorDocs: 0 });
+  const [personalities, setPersonalities] = useState<any[]>([]);
 
   useEffect(() => {
     if (roleLoading) return;
@@ -91,6 +92,7 @@ const Admin = () => {
       setUserOverrides(data.userModelOverrides || []);
       setKbDocs(data.kbDocuments || []);
       setKbStats(data.kbStats || { totalDocs: 0, totalChunks: 0, pendingDocs: 0, errorDocs: 0 });
+      setPersonalities(data.personalities || []);
     } catch (err: any) { toast.error(err.message); } finally { setLoading(false); }
   };
 
@@ -176,6 +178,9 @@ const Admin = () => {
           </TabsTrigger>
           <TabsTrigger value="kb" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <BookOpen className="h-4 w-4 hidden sm:block" /> Knowledge
+          </TabsTrigger>
+          <TabsTrigger value="personalities" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
+            <Sparkles className="h-4 w-4 hidden sm:block" /> Personas
           </TabsTrigger>
           <TabsTrigger value="conversations" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <MessageSquare className="h-4 w-4 hidden sm:block" /> Chats
@@ -302,6 +307,15 @@ const Admin = () => {
             documents={kbDocs}
             kbStats={kbStats}
             profileMap={profileMap}
+            onAction={handleKbAction}
+            onRefresh={loadAdminData}
+          />
+        </TabsContent>
+
+        {/* Personalities Tab */}
+        <TabsContent value="personalities">
+          <PersonalitiesTab
+            personalities={personalities}
             onAction={handleKbAction}
             onRefresh={loadAdminData}
           />

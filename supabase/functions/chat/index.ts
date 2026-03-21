@@ -502,6 +502,7 @@ serve(async (req) => {
     }
 
     const enabledSkills: string[] = Array.isArray(body.skills) ? body.skills : [];
+    const personalityId: string | null = body.personality_id || null;
     
     // All tiers use Lovable AI gateway
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -525,8 +526,23 @@ serve(async (req) => {
       }
     }
 
+    // Fetch personality modifier if set
+    let personalityModifier = "";
+    if (personalityId) {
+      try {
+        const { data: personality } = await accessClient
+          .from("personalities")
+          .select("system_prompt_modifier")
+          .eq("id", personalityId)
+          .single();
+        if (personality?.system_prompt_modifier) {
+          personalityModifier = personality.system_prompt_modifier;
+        }
+      } catch { /* proceed without personality */ }
+    }
+
     const basePrompt = getSystemPrompt(selectedTier);
-    const systemPrompt = `${basePrompt}
+    const systemPrompt = `${personalityModifier ? personalityModifier + "\n\n" : ""}${basePrompt}
 
 ${tools.length > 0 ? "You have access to tools/skills. Use them when they would help answer the user's question." : ""}
 ${enabledSkills.includes("memory") ? "\nYou can remember user preferences across sessions. Proactively store important user context (name, preferences, projects, etc.) using store_memory. Use recall_memory at the start to personalize." : ""}
