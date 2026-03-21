@@ -20,7 +20,7 @@ const Auth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) navigate("/chat");
+    if (user) navigate("/");
   }, [user, navigate]);
 
   const strength = isSignUp ? getPasswordStrength(password) : null;
