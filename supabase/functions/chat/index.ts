@@ -12,6 +12,68 @@ const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_HISTORY_MESSAGES = 50;
 
+// ── LangSmith Observability ──
+
+const LANGSMITH_API = "https://api.smith.langchain.com";
+const LANGSMITH_PROJECT = Deno.env.get("LANGSMITH_PROJECT") || "gclaw-chat";
+
+function getLangChainKey(): string | null {
+  return Deno.env.get("LANGCHAIN_API_KEY") || null;
+}
+
+async function lsCreateRun(params: {
+  name: string;
+  run_type: "chain" | "llm" | "tool";
+  inputs: Record<string, any>;
+  parent_run_id?: string;
+  extra?: Record<string, any>;
+}): Promise<string | null> {
+  const apiKey = getLangChainKey();
+  if (!apiKey) return null;
+  const runId = crypto.randomUUID();
+  try {
+    await fetch(`${LANGSMITH_API}/runs`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: runId,
+        name: params.name,
+        run_type: params.run_type,
+        inputs: params.inputs,
+        start_time: new Date().toISOString(),
+        session_name: LANGSMITH_PROJECT,
+        parent_run_id: params.parent_run_id,
+        extra: params.extra,
+      }),
+    });
+  } catch (e) {
+    console.warn("LangSmith createRun failed:", e);
+  }
+  return runId;
+}
+
+async function lsPatchRun(runId: string | null, patch: {
+  outputs?: Record<string, any>;
+  error?: string;
+  extra?: Record<string, any>;
+}): Promise<void> {
+  if (!runId) return;
+  const apiKey = getLangChainKey();
+  if (!apiKey) return;
+  try {
+    await fetch(`${LANGSMITH_API}/runs/${runId}`, {
+      method: "PATCH",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        end_time: new Date().toISOString(),
+        ...patch,
+      }),
+    });
+  } catch (e) {
+    console.warn("LangSmith patchRun failed:", e);
+  }
+}
+
 // ── Tier → Backend Model Routing ──
 
 const TIER_MODEL_MAP: Record<string, string> = {
@@ -448,6 +510,9 @@ function errorResponse(status: number, message: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Start parent LangSmith trace
+  let parentRunId: string | null = null;
+
   try {
     const body = await req.json();
 
@@ -469,6 +534,21 @@ serve(async (req) => {
     const messages = validateAndSanitize(body.messages);
     const selectedTier = validateTier(body.model || "gclaw/default");
     const backendModel = resolveModel(selectedTier);
+
+    // Create parent LangSmith trace
+    parentRunId = await lsCreateRun({
+      name: "chat",
+      run_type: "chain",
+      inputs: {
+        model: selectedTier,
+        backend_model: backendModel,
+        message_count: messages.length,
+        last_user_message: messages.filter((m: any) => m.role === "user").pop()?.content?.slice(0, 200) || "",
+        skills: body.skills || [],
+        personality_id: body.personality_id || null,
+      },
+      extra: { metadata: { user_id: userId || "anonymous" } },
+    });
 
     // ── Model access enforcement ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -554,6 +634,14 @@ When you use a tool and get results, synthesize the information into a helpful r
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
+      const llmRunId = await lsCreateRun({
+        name: `llm:${backendModel}`,
+        run_type: "llm",
+        inputs: { messages: fullMessages.map((m: any) => ({ role: m.role, content: m.content?.slice(0, 200) })) },
+        parent_run_id: parentRunId || undefined,
+        extra: { metadata: { model: backendModel, stream: true } },
+      });
+
       const response = await fetch(LOVABLE_AI_ENDPOINT, {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -564,11 +652,17 @@ When you use a tool and get results, synthesize the information into a helpful r
         const status = response.status;
         const t = await response.text();
         console.error("API error:", status, t);
+        lsPatchRun(llmRunId, { error: `HTTP ${status}: ${t.slice(0, 200)}` });
+        lsPatchRun(parentRunId, { error: `LLM error: ${status}` });
         return errorResponse(
           status,
           status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required. Please add credits." : "AI error"
         );
       }
+
+      // Fire-and-forget: patch LLM + parent as complete (we can't easily count streamed tokens)
+      lsPatchRun(llmRunId, { outputs: { streamed: true } });
+      lsPatchRun(parentRunId, { outputs: { path: "no-tools-stream", model: backendModel } });
 
       return new Response(response.body, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
@@ -576,6 +670,14 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     // ── With tools: non-streaming first ──
+    const toolLlmRunId = await lsCreateRun({
+      name: `llm:${backendModel}:tool-selection`,
+      run_type: "llm",
+      inputs: { messages: fullMessages.map((m: any) => ({ role: m.role, content: m.content?.slice(0, 200) })), tools_count: tools.length },
+      parent_run_id: parentRunId || undefined,
+      extra: { metadata: { model: backendModel, stream: false } },
+    });
+
     const initialResponse = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -586,6 +688,8 @@ When you use a tool and get results, synthesize the information into a helpful r
       const status = initialResponse.status;
       const t = await initialResponse.text();
       console.error("API error:", status, t);
+      lsPatchRun(toolLlmRunId, { error: `HTTP ${status}` });
+      lsPatchRun(parentRunId, { error: `Tool LLM error: ${status}` });
       return errorResponse(
         status,
         status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required. Please add credits." : "AI error"
@@ -632,10 +736,13 @@ When you use a tool and get results, synthesize the information into a helpful r
     }
 
     const choice = initialData.choices?.[0];
+    const selectedTools = choice?.message?.tool_calls?.map((tc: any) => tc.function?.name) || [];
+    lsPatchRun(toolLlmRunId, { outputs: { tool_calls: selectedTools, has_content: !!choice?.message?.content } });
 
     if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
       const content = choice?.message?.content || "";
       const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+      lsPatchRun(parentRunId, { outputs: { path: "tools-no-call", model: backendModel } });
       return new Response(sseData, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
       });
@@ -671,7 +778,17 @@ When you use a tool and get results, synthesize the information into a helpful r
         `data: ${JSON.stringify({ choices: [{ delta: { content: `*${toolLabel}*\n\n` } }] })}\n\n`
       );
 
+      // Trace tool execution
+      const toolTraceId = await lsCreateRun({
+        name: `tool:${fnName}`,
+        run_type: "tool",
+        inputs: fnArgs,
+        parent_run_id: parentRunId || undefined,
+      });
+
       const result = await executeTool(fnName, fnArgs, userId || "");
+
+      lsPatchRun(toolTraceId, { outputs: { result: result.slice(0, 500) } });
 
       if (result.startsWith("IMAGE_URL:")) {
         const imageUrl = result.slice(10);
@@ -684,6 +801,15 @@ When you use a tool and get results, synthesize the information into a helpful r
       }
     }
 
+    // Trace final LLM call
+    const finalLlmRunId = await lsCreateRun({
+      name: `llm:${backendModel}:final`,
+      run_type: "llm",
+      inputs: { tool_results_count: toolCalls.length },
+      parent_run_id: parentRunId || undefined,
+      extra: { metadata: { model: backendModel, stream: true } },
+    });
+
     // Stream final response with tool results
     const finalResponse = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
@@ -694,8 +820,13 @@ When you use a tool and get results, synthesize the information into a helpful r
     if (!finalResponse.ok) {
       const t = await finalResponse.text();
       console.error("Final API response error:", finalResponse.status, t);
+      lsPatchRun(finalLlmRunId, { error: `HTTP ${finalResponse.status}` });
+      lsPatchRun(parentRunId, { error: `Final LLM error: ${finalResponse.status}` });
       return errorResponse(500, "AI error after tool execution");
     }
+
+    lsPatchRun(finalLlmRunId, { outputs: { streamed: true } });
+    lsPatchRun(parentRunId, { outputs: { path: "tools-executed", model: backendModel, tools_used: selectedTools } });
 
     const encoder = new TextEncoder();
     const statusData = toolStatusChunks.join("");
@@ -721,6 +852,7 @@ When you use a tool and get results, synthesize the information into a helpful r
     });
   } catch (e) {
     console.error("chat error:", e);
+    lsPatchRun(parentRunId, { error: e instanceof Error ? e.message : "Unknown error" });
     return errorResponse(500, e instanceof Error ? e.message : "Unknown error");
   }
 });
