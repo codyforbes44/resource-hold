@@ -634,6 +634,14 @@ When you use a tool and get results, synthesize the information into a helpful r
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
+      const llmRunId = await lsCreateRun({
+        name: `llm:${backendModel}`,
+        run_type: "llm",
+        inputs: { messages: fullMessages.map((m: any) => ({ role: m.role, content: m.content?.slice(0, 200) })) },
+        parent_run_id: parentRunId || undefined,
+        extra: { metadata: { model: backendModel, stream: true } },
+      });
+
       const response = await fetch(LOVABLE_AI_ENDPOINT, {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -644,11 +652,17 @@ When you use a tool and get results, synthesize the information into a helpful r
         const status = response.status;
         const t = await response.text();
         console.error("API error:", status, t);
+        lsPatchRun(llmRunId, { error: `HTTP ${status}: ${t.slice(0, 200)}` });
+        lsPatchRun(parentRunId, { error: `LLM error: ${status}` });
         return errorResponse(
           status,
           status === 429 ? "Rate limit exceeded. Please wait a moment." : status === 402 ? "Payment required. Please add credits." : "AI error"
         );
       }
+
+      // Fire-and-forget: patch LLM + parent as complete (we can't easily count streamed tokens)
+      lsPatchRun(llmRunId, { outputs: { streamed: true } });
+      lsPatchRun(parentRunId, { outputs: { path: "no-tools-stream", model: backendModel } });
 
       return new Response(response.body, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
