@@ -1,44 +1,26 @@
 
 
-## Make `/chat` the Homepage & Refactor Navigation
+## Add TIMP Documentation to Knowledge Base
 
 ### What
-Make the chat interface the root route (`/`), remove the separate Landing page, and update all navigation references accordingly.
+Create a TIMP documentation text file and ingest it into the knowledge base so the chat AI can reference it via RAG.
 
-### Changes
+### How
+1. Write the full TIMP content to a temporary `.txt` file
+2. Upload it to the `knowledge_documents` storage bucket via the edge function
+3. The existing `knowledge-upload` edge function will chunk and embed it automatically
 
-#### 1. Update `src/App.tsx` — Route changes
-- Change Chat from `/chat` to `/`
-- Remove the Landing route entirely
-- Remove the Landing lazy import
-- Keep all other routes (`/auth`, `/settings`, `/admin`, `/reset-password`)
+### Implementation
+- Use `lov-exec` to write the content to `/tmp/timp-documentation.txt`
+- Call the `knowledge-upload` edge function with the file data to process and index it
+- Since this requires an authenticated user context, we'll instead insert the document record and file directly via SQL + storage, then trigger processing
 
-#### 2. Delete `src/pages/Landing.tsx`
-- No longer needed since chat is the homepage
-
-#### 3. Update `src/pages/Auth.tsx`
-- Change `navigate("/chat")` → `navigate("/")`
-
-#### 4. Update `src/components/AppShell.tsx`
-- Change default `backTo` prop from `"/chat"` to `"/"`
-
-#### 5. Update `src/components/chat/ChatSidebar.tsx`
-- Update any `/chat` links to `/`
-
-#### 6. Update `src/components/chat/ChatMessages.tsx`
-- `/auth` links remain as-is (correct)
-
-#### 7. Update `src/hooks/useConversations.ts`
-- No changes needed (no routing references)
-
-#### 8. Update `public/sitemap.xml` and `public/manifest.json`
-- Update start_url and sitemap entries to reflect `/` as the main page, remove `/chat`
+**Approach:** Insert the document directly into the database and storage bucket using the admin/service path:
+1. Write TIMP content to `/tmp/timp-documentation.txt`
+2. Upload to `knowledge_documents` storage bucket via edge function curl
+3. Insert record into `knowledge_documents` table
+4. Call `knowledge-upload` edge function with `action: "process"` to chunk and embed
 
 ### Files
-- `src/App.tsx` — reroute `/` to Chat, drop Landing
-- `src/pages/Landing.tsx` — delete
-- `src/pages/Auth.tsx` — fix redirect
-- `src/components/AppShell.tsx` — fix backTo default
-- `src/components/chat/ChatSidebar.tsx` — fix any `/chat` refs
-- `public/sitemap.xml`, `public/manifest.json` — update URLs
+- No source code changes needed — this is a data ingestion task only
 
