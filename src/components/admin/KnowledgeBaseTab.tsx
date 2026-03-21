@@ -17,6 +17,7 @@ type KBDoc = {
   chunk_count: number;
   file_size: number;
   user_id: string;
+  category?: string;
   created_at: string;
   updated_at: string;
   error_message: string | null;
