@@ -49,27 +49,17 @@ serve(async (req) => {
 
       if (action === "assign_role") {
         const { user_id, role } = body;
-        const { error } = await adminClient
-          .from("user_roles")
-          .upsert({ user_id, role }, { onConflict: "user_id,role" });
+        const { error } = await adminClient.from("user_roles").upsert({ user_id, role }, { onConflict: "user_id,role" });
         if (error) throw error;
-        await adminClient.from("audit_logs").insert({
-          actor_id: user.id, action: "assign_role", target_type: "user", target_id: user_id, metadata: { role },
-        });
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "assign_role", target_type: "user", target_id: user_id, metadata: { role } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (action === "revoke_role") {
         const { user_id, role } = body;
-        const { error } = await adminClient
-          .from("user_roles")
-          .delete()
-          .eq("user_id", user_id)
-          .eq("role", role);
+        const { error } = await adminClient.from("user_roles").delete().eq("user_id", user_id).eq("role", role);
         if (error) throw error;
-        await adminClient.from("audit_logs").insert({
-          actor_id: user.id, action: "revoke_role", target_type: "user", target_id: user_id, metadata: { role },
-        });
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "revoke_role", target_type: "user", target_id: user_id, metadata: { role } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -78,42 +68,72 @@ serve(async (req) => {
         const update: Record<string, any> = {};
         if (typeof enabled === "boolean") update.enabled = enabled;
         if (typeof visitor_enabled === "boolean") update.visitor_enabled = visitor_enabled;
-        const { error } = await adminClient
-          .from("model_access_defaults")
-          .update(update)
-          .eq("model", model);
+        const { error } = await adminClient.from("model_access_defaults").update(update).eq("model", model);
         if (error) throw error;
-        await adminClient.from("audit_logs").insert({
-          actor_id: user.id, action: "set_model_default", target_type: "model", target_id: model, metadata: update,
-        });
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "set_model_default", target_type: "model", target_id: model, metadata: update });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (action === "set_user_model_override") {
         const { user_id, model, enabled } = body;
         if (enabled === null) {
-          // Remove override
-          await adminClient
-            .from("user_model_overrides")
-            .delete()
-            .eq("user_id", user_id)
-            .eq("model", model);
+          await adminClient.from("user_model_overrides").delete().eq("user_id", user_id).eq("model", model);
         } else {
-          await adminClient
-            .from("user_model_overrides")
-            .upsert({ user_id, model, enabled }, { onConflict: "user_id,model" });
+          await adminClient.from("user_model_overrides").upsert({ user_id, model, enabled }, { onConflict: "user_id,model" });
         }
-        await adminClient.from("audit_logs").insert({
-          actor_id: user.id, action: "set_user_model_override", target_type: "user_model", target_id: `${user_id}:${model}`, metadata: { enabled },
-        });
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "set_user_model_override", target_type: "user_model", target_id: `${user_id}:${model}`, metadata: { enabled } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Knowledge Base actions
+      if (action === "delete_kb_doc") {
+        const { doc_id } = body;
+        await adminClient.from("knowledge_chunks").delete().eq("document_id", doc_id);
+        await adminClient.from("knowledge_documents").delete().eq("id", doc_id);
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "delete_kb_doc", target_type: "knowledge_document", target_id: doc_id });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "add_kb_url") {
+        const { url } = body;
+        // Call the knowledge-batch-ingest function
+        const resp = await fetch(`${supabaseUrl}/functions/v1/knowledge-batch-ingest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: authHeader },
+          body: JSON.stringify({ urls: [url] }),
+        });
+        if (!resp.ok) { const err = await resp.text(); throw new Error(err); }
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "trigger_kb_refresh") {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/knowledge-refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` },
+        });
+        if (!resp.ok) { const err = await resp.text(); throw new Error(err); }
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "trigger_kb_refresh", target_type: "knowledge_base" });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "bulk_cleanup_kb") {
+        // Delete stuck "processing" docs older than 30 minutes
+        const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const { data: stuckDocs } = await adminClient.from("knowledge_documents").select("id").eq("status", "processing").lt("updated_at", cutoff);
+        if (stuckDocs && stuckDocs.length > 0) {
+          const ids = stuckDocs.map((d: any) => d.id);
+          await adminClient.from("knowledge_chunks").delete().in("document_id", ids);
+          await adminClient.from("knowledge_documents").delete().in("id", ids);
+        }
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "bulk_cleanup_kb", target_type: "knowledge_base", metadata: { deleted: stuckDocs?.length || 0 } });
+        return new Response(JSON.stringify({ success: true, deleted: stuckDocs?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       throw new Error(`Unknown action: ${action}`);
     }
 
     // GET: Fetch admin dashboard data
-    const [profilesRes, conversationsRes, auditRes, userCountRes, convCountRes, msgCountRes, modelDefaultsRes, userOverridesRes] =
+    const [profilesRes, conversationsRes, auditRes, userCountRes, convCountRes, msgCountRes, modelDefaultsRes, userOverridesRes, kbDocsRes, kbChunkCountRes, kbPendingRes, kbErrorRes] =
       await Promise.all([
         adminClient.from("profiles").select("*").order("created_at", { ascending: false }).limit(100),
         adminClient.from("conversations").select("*, messages(count)").order("updated_at", { ascending: false }).limit(100),
@@ -123,6 +143,10 @@ serve(async (req) => {
         adminClient.from("messages").select("*", { count: "exact", head: true }),
         adminClient.from("model_access_defaults").select("*").order("model"),
         adminClient.from("user_model_overrides").select("*"),
+        adminClient.from("knowledge_documents").select("*").order("updated_at", { ascending: false }).limit(500),
+        adminClient.from("knowledge_chunks").select("*", { count: "exact", head: true }),
+        adminClient.from("knowledge_documents").select("*", { count: "exact", head: true }).eq("status", "processing"),
+        adminClient.from("knowledge_documents").select("*", { count: "exact", head: true }).eq("status", "error"),
       ]);
 
     const conversations = (conversationsRes.data || []).map((c: any) => ({
@@ -143,6 +167,13 @@ serve(async (req) => {
         },
         modelDefaults: modelDefaultsRes.data || [],
         userModelOverrides: userOverridesRes.data || [],
+        kbDocuments: kbDocsRes.data || [],
+        kbStats: {
+          totalDocs: (kbDocsRes.data || []).length,
+          totalChunks: kbChunkCountRes.count || 0,
+          pendingDocs: kbPendingRes.count || 0,
+          errorDocs: kbErrorRes.count || 0,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
