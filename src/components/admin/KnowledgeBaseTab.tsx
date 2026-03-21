@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
   Search, Trash2, RefreshCw, Plus, AlertTriangle, CheckCircle2,
-  Clock, FileText, Link as LinkIcon, Loader2,
+  Clock, FileText, Link as LinkIcon, Loader2, Upload,
 } from "lucide-react";
 
 type KBDoc = {
@@ -29,6 +29,9 @@ interface KnowledgeBaseTabProps {
   onAction: (action: string, payload?: any) => Promise<void>;
   onRefresh: () => void;
 }
+
+const ACCEPTED_TYPES = ".txt,.md,.csv,.html,.json,.pdf";
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -55,6 +58,8 @@ const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh 
   const [addingUrl, setAddingUrl] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = documents.filter((d) => {
     const matchesSearch = !search ||
@@ -76,6 +81,37 @@ const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh 
       toast.error(e.message);
     } finally {
       setAddingUrl(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File too large (max 10MB)");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      await onAction("upload_kb_file", {
+        file_base64: base64,
+        filename: file.name,
+        mime_type: file.type || "application/octet-stream",
+      });
+      toast.success(`"${file.name}" uploaded and queued for processing`);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -146,6 +182,22 @@ const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh 
           </Button>
         </div>
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_TYPES}
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="min-h-[44px]"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+            {uploading ? "Uploading…" : "Upload File"}
+          </Button>
           <Button variant="outline" onClick={handleRefreshAll} disabled={refreshing} className="min-h-[44px]">
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh All
           </Button>
