@@ -11,6 +11,7 @@ const LOVABLE_AI_ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions"
 const EMBEDDING_MODEL = "google/gemini-2.5-flash-lite";
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
+const EMBEDDING_CONCURRENCY = 3;
 
 // ── Helpers ──
 
@@ -114,28 +115,52 @@ async function processAndIndex(
   const chunks = chunkText(cleanText, CHUNK_SIZE, CHUNK_OVERLAP);
   console.log(`Document ${documentId}: ${chunks.length} chunks from ${cleanText.length} chars`);
 
-  // Delete existing chunks for re-processing
   await adminClient.from("knowledge_chunks").delete().eq("document_id", documentId);
 
   let successCount = 0;
-  for (let i = 0; i < chunks.length; i++) {
-    try {
-      const embedding = await generateEmbedding(chunks[i], lovableKey);
-      await adminClient.from("knowledge_chunks").insert({
+
+  for (let start = 0; start < chunks.length; start += EMBEDDING_CONCURRENCY) {
+    const batch = chunks.slice(start, start + EMBEDDING_CONCURRENCY);
+    const embeddings = await Promise.all(
+      batch.map(async (chunk, batchIndex) => {
+        const chunkIndex = start + batchIndex;
+
+        try {
+          const embedding = await generateEmbedding(chunk, lovableKey);
+          return { chunk, chunkIndex, embedding };
+        } catch (embErr) {
+          console.error(`Chunk ${chunkIndex} embedding failed:`, embErr);
+          return null;
+        }
+      }),
+    );
+
+    for (const result of embeddings) {
+      if (!result) continue;
+
+      const { error } = await adminClient.from("knowledge_chunks").insert({
         document_id: documentId,
         user_id: userId,
-        content: chunks[i],
-        chunk_index: i,
-        embedding: `[${embedding.join(",")}]`,
+        content: result.chunk,
+        chunk_index: result.chunkIndex,
+        embedding: `[${result.embedding.join(",")}]`,
       });
+
+      if (error) {
+        console.error(`Chunk ${result.chunkIndex} insert failed:`, error);
+        continue;
+      }
+
       successCount++;
-    } catch (embErr) {
-      console.error(`Chunk ${i} embedding failed:`, embErr);
     }
 
-    if (i > 0 && i % 5 === 0) {
-      await new Promise((r) => setTimeout(r, 1000));
+    if (start + EMBEDDING_CONCURRENCY < chunks.length) {
+      await new Promise((r) => setTimeout(r, 250));
     }
+  }
+
+  if (successCount === 0) {
+    throw new Error("Failed to embed any document chunks");
   }
 
   return successCount;
