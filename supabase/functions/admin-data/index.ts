@@ -148,7 +148,7 @@ serve(async (req) => {
       if (action === "trigger_kb_refresh") {
         const resp = await fetch(`${supabaseUrl}/functions/v1/knowledge-refresh`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` },
+          headers: { "Content-Type": "application/json", Authorization: authHeader },
         });
         if (!resp.ok) { const err = await resp.text(); throw new Error(err); }
         await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "trigger_kb_refresh", target_type: "knowledge_base" });
