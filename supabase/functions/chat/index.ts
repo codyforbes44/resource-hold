@@ -1038,13 +1038,6 @@ When you use a tool and get results, synthesize the information into a helpful r
     lsPatchRun(finalLlmRunId, { outputs: { streamed: true } });
     lsPatchRun(parentRunId, { outputs: { path: "tools-executed", model: backendModel, tools_used: selectedTools, council_decision: councilDecision.reason } });
 
-    // TIMP: fire-and-forget
-    timp.storeSessionAsync(
-      parentRunId || crypto.randomUUID(),
-      lastUserMsg,
-      "[streamed tool response]",
-      { model: backendModel, path: "tools-executed", tools: selectedTools },
-    );
 
     const encoder = new TextEncoder();
     const statusData = toolStatusChunks.join("");
