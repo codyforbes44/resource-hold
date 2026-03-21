@@ -67,6 +67,43 @@ const CodeBlock = ({
   );
 };
 
+const ImageRenderer = ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
+  const [imgError, setImgError] = useState(false);
+  const isStorageUrl = src?.includes("/storage/v1/object/public/chat_images/");
+  if (imgError) {
+    return (
+      <div className="my-3 inline-flex items-center gap-2 rounded-lg border border-border/30 bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        <ExternalLink className="h-4 w-4" />
+        <a href={src} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View image</a>
+      </div>
+    );
+  }
+  return (
+    <div className="relative group/img my-3 inline-block">
+      <a href={src} target="_blank" rel="noopener noreferrer" className="block">
+        <img
+          src={src}
+          alt={alt || ""}
+          className="rounded-lg max-h-[32rem] w-auto border border-border/30 hover:border-border transition-colors"
+          loading="lazy"
+          onError={() => setImgError(true)}
+          {...props}
+        />
+      </a>
+      {isStorageUrl && (
+        <a
+          href={src}
+          download
+          className="absolute top-2 right-2 rounded-md bg-background/80 backdrop-blur-sm p-1.5 opacity-0 group-hover/img:opacity-100 transition-opacity border border-border/50 hover:bg-accent"
+          title="Download image"
+        >
+          <Download className="h-4 w-4 text-foreground" />
+        </a>
+      )}
+    </div>
+  );
+};
+
 /** Parse <think>...</think> blocks out of content */
 function parseThinkingBlocks(content: string): { thinking: string | null; rest: string } {
   const match = content.match(/^<think>([\s\S]*?)<\/think>\s*/);
