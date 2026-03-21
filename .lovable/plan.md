@@ -1,60 +1,52 @@
 
 
-## Agent Council + LangChain Orchestration
+## AGI Research Plan: Knowledge Base + Project Tracker
 
-### Current State
+### Part 1: Ingest Plan as Knowledge Base Document
 
-- **Agent Council**: Multi-agent deliberation framework with 5 specialist agents (Code, Research, Memory, Task, Creative)
-- **LangSmith**: REST-based observability tracing with full chain/agent/tool hierarchy
-- **TIMP**: Proprietary knowledge base document indexed via RAG (3 chunks in `knowledge_documents`). Surfaced automatically via the `search_knowledge` tool when users ask about it. No external TIMP service — no HTTP client needed.
-- **Knowledge Base RAG**: Handles all document retrieval including TIMP documentation
-- **Taskade**: Backend integration preserved but fully removed from user-facing surfaces (no skills panel entry, no admin tab, no chat tools)
+Use `lov-exec` to write the full AGI research plan as a `.txt` file and upload it to the `knowledge_documents` storage bucket, then insert a record and trigger chunking/embedding via the `knowledge-upload` edge function. Same process used for the TIMP document.
 
-### Architecture
+### Part 2: Build Research Tracker Page
 
-```text
-User Message
-     │
-     ▼
-┌─────────────────────────────────┐
-│        Agent Council Router     │  ← Determines which agents to consult
-│   (Complexity + skill analysis) │
-└──────────┬──────────────────────┘
-           │
-     ┌─────┼─────┬─────────┐
-     ▼     ▼     ▼         ▼
-  ┌─────┐ ┌────┐ ┌──────┐ ┌──────────┐
-  │Coder│ │Res.│ │Memory│ │Creative  │
-  │Agent│ │Agt.│ │Agent │ │Agent     │
-  └──┬──┘ └─┬──┘ └──┬───┘ └────┬─────┘
-     │      │       │           │
-     └──────┴───┬───┴───────────┘
-                ▼
-     ┌──────────────────┐
-     │  Council Merger   │  ← Synthesizes agent outputs
-     │  (Final LLM call) │
-     └────────┬─────────┘
-              │
-              ▼
-     ┌──────────────────┐
-     │  LangSmith Trace  │  ← Full chain traced
-     └──────────────────┘
-```
+Create a new `/research` page (admin-gated) with a visual phase tracker for the 4-phase AGI plan.
 
-### Key Files
+**Database: `research_milestones` table**
 
-| File | Purpose |
-|------|---------|
-| `supabase/functions/chat/index.ts` | Main chat handler with tool execution, LangSmith tracing, council routing |
-| `supabase/functions/chat/agent-council.ts` | Agent Council framework: routing, specialist agents, merger |
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| phase | integer | 1-4 |
+| phase_title | text | e.g. "Foundational Research" |
+| milestone_title | text | e.g. "Define AGI Criteria" |
+| description | text | Deliverable description |
+| status | text | `not_started`, `in_progress`, `completed`, `blocked` |
+| notes | text | Free-form progress notes |
+| sort_order | integer | Ordering within phase |
+| created_at, updated_at | timestamptz | Defaults |
 
-### TIMP as Knowledge Base
+RLS: Admin-only read/write via `has_role()`.
 
-TIMP documentation is stored as a knowledge base document (`.txt` file, 3 chunks, status: ready). When users ask about TIMP, the `search_knowledge` tool retrieves relevant chunks via vector similarity search. No external TIMP API service exists or is needed.
+**New files:**
+- `src/pages/Research.tsx` — Phase-based tracker with expandable milestones, status badges, progress bars per phase
+- Route added to `App.tsx` as admin-gated `/research`
+- Nav link added to `AppShell.tsx`
 
-### Taskade (Hidden from Users)
+**UI design:**
+- 4 phase cards in a vertical layout, each showing a progress bar (% milestones completed)
+- Expandable accordion per phase listing milestones with status badges
+- Inline status dropdown to update milestone status
+- Notes textarea for each milestone
+- Color-coded: not_started (gray), in_progress (blue), completed (green), blocked (red)
 
-Backend infrastructure (`supabase/functions/taskade/`, `taskade_configs`, `taskade_sync_log`) is preserved but all user-facing entry points have been removed:
-- No skills panel entry
-- No admin dashboard tab
-- No chat tool definitions or executors
+**Seed data:** Pre-populate all 20 milestones from the 4-phase plan via SQL insert.
+
+### Files Changed
+
+| File | Action |
+|------|--------|
+| Knowledge base | Ingest AGI plan `.txt` via edge function |
+| Migration | Create `research_milestones` table + RLS + seed data |
+| `src/pages/Research.tsx` | New tracker page |
+| `src/App.tsx` | Add `/research` route |
+| `src/components/AppShell.tsx` | Add nav link |
+
