@@ -86,6 +86,45 @@ serve(async (req) => {
       }
 
       // Knowledge Base actions
+      if (action === "upload_kb_file") {
+        const { file_base64, filename, mime_type } = body;
+        const fileBytes = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
+        const filePath = `${user.id}/${crypto.randomUUID()}-${filename}`;
+
+        const { error: uploadErr } = await adminClient.storage
+          .from("knowledge_documents")
+          .upload(filePath, fileBytes, { contentType: mime_type, upsert: false });
+        if (uploadErr) throw uploadErr;
+
+        const { data: docRow, error: insertErr } = await adminClient
+          .from("knowledge_documents")
+          .insert({
+            user_id: user.id,
+            filename,
+            file_path: filePath,
+            mime_type,
+            file_size: fileBytes.length,
+            status: "pending",
+          })
+          .select("id")
+          .single();
+        if (insertErr) throw insertErr;
+
+        // Trigger processing via knowledge-upload function
+        const processResp = await fetch(`${supabaseUrl}/functions/v1/knowledge-upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: authHeader },
+          body: JSON.stringify({ action: "process", document_id: docRow.id }),
+        });
+        if (!processResp.ok) {
+          const errText = await processResp.text();
+          console.error("process trigger failed:", errText);
+        }
+
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "upload_kb_file", target_type: "knowledge_document", target_id: docRow.id, metadata: { filename, mime_type } });
+        return new Response(JSON.stringify({ success: true, document_id: docRow.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (action === "delete_kb_doc") {
         const { doc_id } = body;
         await adminClient.from("knowledge_chunks").delete().eq("document_id", doc_id);
