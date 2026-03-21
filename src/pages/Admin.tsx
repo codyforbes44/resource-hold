@@ -92,6 +92,7 @@ const Admin = () => {
       setUserOverrides(data.userModelOverrides || []);
       setKbDocs(data.kbDocuments || []);
       setKbStats(data.kbStats || { totalDocs: 0, totalChunks: 0, pendingDocs: 0, errorDocs: 0 });
+      setPersonalities(data.personalities || []);
     } catch (err: any) { toast.error(err.message); } finally { setLoading(false); }
   };
 
