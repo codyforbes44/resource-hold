@@ -60,6 +60,14 @@ const App = () => (
                       </AuthGuard>
                     }
                   />
+                  <Route
+                    path="/research"
+                    element={
+                      <AuthGuard>
+                        <Research />
+                      </AuthGuard>
+                    }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
