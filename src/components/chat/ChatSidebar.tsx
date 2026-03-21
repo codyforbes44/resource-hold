@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus, Trash2, LogOut, PanelLeftClose, Search, Settings,
-  ShieldCheck, Pencil, LogIn,
+  ShieldCheck, Pencil, LogIn, FlaskConical,
 } from "lucide-react";
 import logoSrc from "@/assets/logo-gclaw.png";
 
