@@ -12,7 +12,7 @@ interface AppShellProps {
   maxWidth?: string;
 }
 
-const AppShell = ({ title, badge, children, backTo = "/chat", maxWidth }: AppShellProps) => {
+const AppShell = ({ title, badge, children, backTo = "/", maxWidth }: AppShellProps) => {
   const navigate = useNavigate();
 
   return (

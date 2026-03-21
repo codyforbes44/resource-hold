@@ -20,7 +20,7 @@ const Auth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) navigate("/chat");
+    if (user) navigate("/");
   }, [user, navigate]);
 
   const strength = isSignUp ? getPasswordStrength(password) : null;
@@ -55,7 +55,7 @@ const Auth = () => {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate("/chat");
+        navigate("/");
       }
     } catch (err: any) {
       toast.error(err.message);
