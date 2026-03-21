@@ -326,6 +326,11 @@ const Admin = () => {
           />
         </TabsContent>
 
+        {/* Taskade Tab */}
+        <TabsContent value="taskade">
+          <TaskadeTab />
+        </TabsContent>
+
         {/* Conversations Tab */}
         <TabsContent value="conversations" className="space-y-4">
           <div className="flex items-center gap-2">
