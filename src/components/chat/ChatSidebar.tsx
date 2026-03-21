@@ -161,6 +161,11 @@ const ChatSidebar = ({
                 <Settings className="h-4 w-4" /> Settings
               </Button>
               {isAdmin && (
+                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/research")}>
+                  <FlaskConical className="h-4 w-4" /> Research
+                </Button>
+              )}
+              {isAdmin && (
                 <Button variant="ghost" size="sm" className="w-full justify-start gap-2 min-h-[44px]" onClick={() => navigate("/admin")}>
                   <ShieldCheck className="h-4 w-4" /> Admin
                 </Button>
