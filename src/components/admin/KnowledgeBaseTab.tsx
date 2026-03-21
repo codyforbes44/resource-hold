@@ -70,7 +70,8 @@ const KnowledgeBaseTab = ({ documents, kbStats, profileMap, onAction, onRefresh 
       d.filename.toLowerCase().includes(search.toLowerCase()) ||
       (d.source_url || "").toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || d.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCategory = categoryFilter === "all" || (d.category || "general") === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
   });
 
   const handleAddUrl = async () => {
