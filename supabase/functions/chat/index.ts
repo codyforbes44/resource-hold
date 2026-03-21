@@ -386,6 +386,7 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite",
+        stream: false,
         messages: [
           {
             role: "system",
@@ -414,7 +415,28 @@ async function executeKnowledgeSearch(query: string, userId: string): Promise<st
 
     if (!embResponse.ok) return `Knowledge search failed: embedding generation error (${embResponse.status})`;
 
-    const embData = await embResponse.json();
+    const embText = await embResponse.text();
+    let embData: any;
+    try {
+      // Handle potential SSE format
+      if (embText.startsWith("data: ") || embText.startsWith(":")) {
+        const lines = embText.split("\n").filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
+        const chunks = lines.map(l => { try { return JSON.parse(l.slice(6)); } catch { return null; } }).filter(Boolean);
+        // Reconstruct tool_calls from SSE chunks
+        let toolCallArgs = "";
+        for (const c of chunks) {
+          const tc = c.choices?.[0]?.delta?.tool_calls?.[0];
+          if (tc?.function?.arguments) toolCallArgs += tc.function.arguments;
+        }
+        embData = { choices: [{ message: { tool_calls: [{ function: { arguments: toolCallArgs } }] } }] };
+      } else {
+        embData = JSON.parse(embText);
+      }
+    } catch (parseErr) {
+      console.error("Embedding response parse error:", embText.slice(0, 300));
+      return "Knowledge search failed: embedding response parse error";
+    }
+
     const toolCall = embData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) return "Knowledge search failed: no embedding generated";
 
