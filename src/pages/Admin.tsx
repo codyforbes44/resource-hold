@@ -30,7 +30,6 @@ type UserModelOverride = { user_id: string; model: string; enabled: boolean };
 const PROVIDER_CONFIG: Record<string, { color: string; label: string }> = {
   google: { color: "hsl(var(--primary))", label: "Google" },
   openai: { color: "hsl(142 71% 45%)", label: "OpenAI" },
-  zephel: { color: "hsl(270 70% 60%)", label: "Zephel" },
 };
 
 function getProvider(model: string) {
