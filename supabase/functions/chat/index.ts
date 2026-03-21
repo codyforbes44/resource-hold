@@ -801,6 +801,15 @@ When you use a tool and get results, synthesize the information into a helpful r
       }
     }
 
+    // Trace final LLM call
+    const finalLlmRunId = await lsCreateRun({
+      name: `llm:${backendModel}:final`,
+      run_type: "llm",
+      inputs: { tool_results_count: toolCalls.length },
+      parent_run_id: parentRunId || undefined,
+      extra: { metadata: { model: backendModel, stream: true } },
+    });
+
     // Stream final response with tool results
     const finalResponse = await fetch(LOVABLE_AI_ENDPOINT, {
       method: "POST",
@@ -811,8 +820,13 @@ When you use a tool and get results, synthesize the information into a helpful r
     if (!finalResponse.ok) {
       const t = await finalResponse.text();
       console.error("Final API response error:", finalResponse.status, t);
+      lsPatchRun(finalLlmRunId, { error: `HTTP ${finalResponse.status}` });
+      lsPatchRun(parentRunId, { error: `Final LLM error: ${finalResponse.status}` });
       return errorResponse(500, "AI error after tool execution");
     }
+
+    lsPatchRun(finalLlmRunId, { outputs: { streamed: true } });
+    lsPatchRun(parentRunId, { outputs: { path: "tools-executed", model: backendModel, tools_used: selectedTools } });
 
     const encoder = new TextEncoder();
     const statusData = toolStatusChunks.join("");
@@ -838,6 +852,7 @@ When you use a tool and get results, synthesize the information into a helpful r
     });
   } catch (e) {
     console.error("chat error:", e);
+    lsPatchRun(parentRunId, { error: e instanceof Error ? e.message : "Unknown error" });
     return errorResponse(500, e instanceof Error ? e.message : "Unknown error");
   }
 });
