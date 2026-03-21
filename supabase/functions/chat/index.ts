@@ -763,7 +763,26 @@ ${enabledSkills.includes("browser") ? "\nYou can browse specific web pages to ex
 
 When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.${memoryContext}`;
 
-    const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
+    // ── TIMP: Fetch historical context ──
+    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content || "";
+    let timpContext = "";
+    if (timp.isConfigured && lastUserMsg) {
+      try {
+        timpContext = await timp.getHistoricalContext(lastUserMsg, 3);
+        if (timpContext) {
+          console.log("TIMP: Found historical context");
+        }
+      } catch (e) {
+        console.warn("TIMP context fetch failed:", e);
+      }
+    }
+
+    const finalSystemPrompt = systemPrompt + timpContext;
+    const fullMessages = [{ role: "system", content: finalSystemPrompt }, ...messages];
+
+    // ── Agent Council routing ──
+    const councilDecision = routeQuery(lastUserMsg, enabledSkills);
+    console.log(`Council decision: ${councilDecision.reason} (useCouncil: ${councilDecision.useCouncil})`);
 
     // ── No tools: streaming pass-through ──
     if (tools.length === 0) {
