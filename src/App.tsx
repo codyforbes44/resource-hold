@@ -11,7 +11,6 @@ import AuthGuard from "@/components/AuthGuard";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 // Route-level code splitting
-const Landing = lazy(() => import("./pages/Landing"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
