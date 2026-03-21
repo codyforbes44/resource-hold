@@ -179,6 +179,9 @@ const Admin = () => {
           <TabsTrigger value="kb" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <BookOpen className="h-4 w-4 hidden sm:block" /> Knowledge
           </TabsTrigger>
+          <TabsTrigger value="personalities" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
+            <Sparkles className="h-4 w-4 hidden sm:block" /> Personas
+          </TabsTrigger>
           <TabsTrigger value="conversations" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <MessageSquare className="h-4 w-4 hidden sm:block" /> Chats
           </TabsTrigger>
