@@ -168,6 +168,42 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true, deleted: stuckDocs?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // Personality CRUD
+      if (action === "create_personality") {
+        const { name, slug, description, system_prompt_modifier, icon, is_default } = body;
+        const maxOrder = await adminClient.from("personalities").select("sort_order").order("sort_order", { ascending: false }).limit(1);
+        const nextOrder = ((maxOrder.data?.[0] as any)?.sort_order ?? -1) + 1;
+        if (is_default) await adminClient.from("personalities").update({ is_default: false }).eq("is_default", true);
+        const { error } = await adminClient.from("personalities").insert({ name, slug, description, system_prompt_modifier, icon, is_default: is_default || false, sort_order: nextOrder });
+        if (error) throw error;
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "create_personality", target_type: "personality", metadata: { name } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "update_personality") {
+        const { id, name, slug, description, system_prompt_modifier, icon, is_default } = body;
+        if (is_default) await adminClient.from("personalities").update({ is_default: false }).eq("is_default", true);
+        const { error } = await adminClient.from("personalities").update({ name, slug, description, system_prompt_modifier, icon, is_default }).eq("id", id);
+        if (error) throw error;
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "update_personality", target_type: "personality", target_id: id, metadata: { name } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "delete_personality") {
+        const { id } = body;
+        const { error } = await adminClient.from("personalities").delete().eq("id", id);
+        if (error) throw error;
+        await adminClient.from("audit_logs").insert({ actor_id: user.id, action: "delete_personality", target_type: "personality", target_id: id });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "update_kb_doc_category") {
+        const { doc_id, category } = body;
+        const { error } = await adminClient.from("knowledge_documents").update({ category }).eq("id", doc_id);
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       throw new Error(`Unknown action: ${action}`);
     }
 
