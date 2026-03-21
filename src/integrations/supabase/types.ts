@@ -314,6 +314,45 @@ export type Database = {
         }
         Relationships: []
       }
+      research_milestones: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          milestone_title: string
+          notes: string
+          phase: number
+          phase_title: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          milestone_title: string
+          notes?: string
+          phase: number
+          phase_title: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          milestone_title?: string
+          notes?: string
+          phase?: number
+          phase_title?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       taskade_configs: {
         Row: {
           created_at: string
