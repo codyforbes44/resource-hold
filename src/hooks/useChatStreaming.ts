@@ -109,9 +109,10 @@ export function useChatStreaming(
     finally { setIsStreaming(false); abortRef.current = null; }
   };
 
-  const send = useCallback(async (overrideInput?: string, inputState?: string, setInput?: (v: string) => void) => {
+  const send = useCallback(async (overrideInput?: string, inputState?: string, setInput?: (v: string) => void, imageUrls?: string[]) => {
     const text = (overrideInput || inputState || "").trim();
-    if (!text || isStreaming) return;
+    if (!text && (!imageUrls || imageUrls.length === 0)) return;
+    if (isStreaming) return;
     const validation = messageSchema.safeParse(text);
     if (!validation.success) { toast.error(validation.error.errors[0].message); return; }
     const userMsg: Msg = { role: "user", content: text };
