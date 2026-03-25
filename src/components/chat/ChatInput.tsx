@@ -7,7 +7,7 @@ import type { Skill } from "@/components/chat/SkillsPanel";
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_IMAGES = 4;
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export type AttachedImage = { file: File; preview: string };
 
@@ -79,7 +79,7 @@ const ChatInput = ({
         return false;
       }
       if (f.size > MAX_IMAGE_SIZE) {
-        toast.error(`${f.name} exceeds 5MB limit`);
+        toast.error(`${f.name} exceeds 10MB limit`);
         return false;
       }
       return true;
