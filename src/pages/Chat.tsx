@@ -241,7 +241,19 @@ const Chat = () => {
             <ChatInput
               input={input}
               setInput={setInput}
-              onSend={() => send(undefined, input, setInput)}
+              onSend={async (images?: AttachedImage[]) => {
+                if (images && images.length > 0) {
+                  let convId = activeConv;
+                  if (!convId) {
+                    convId = await createConversation(model, personalityId);
+                    if (!convId) return;
+                  }
+                  const urls = await uploadChatImages(images, user, convId);
+                  send(undefined, input, setInput, urls);
+                } else {
+                  send(undefined, input, setInput);
+                }
+              }}
               isStreaming={isStreaming}
               enabledSkillIds={enabledSkillIds}
               skills={skills}

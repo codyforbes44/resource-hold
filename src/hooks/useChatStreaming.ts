@@ -133,9 +133,25 @@ export function useChatStreaming(
     const controller = new AbortController();
     abortRef.current = controller;
     try {
+      // Build API messages, converting image markdown to multimodal content
+      const apiMessages = allMessages.map((m) => {
+        if (m.role === "user" && m.content.includes("![image](")) {
+          const parts: any[] = [];
+          const imgRegex = /!\[image\]\(([^)]+)\)/g;
+          let match;
+          while ((match = imgRegex.exec(m.content)) !== null) {
+            parts.push({ type: "image_url", image_url: { url: match[1] } });
+          }
+          const textOnly = m.content.replace(/!\[image\]\([^)]+\)\n*/g, "").trim();
+          if (textOnly) parts.push({ type: "text", text: textOnly });
+          return { role: m.role, content: parts };
+        }
+        return m;
+      });
+
       const resp = await fetch(CHAT_URL, {
         method: "POST", headers: await buildHeaders(),
-        body: JSON.stringify({ messages: allMessages, model, personality_id: personalityId, skills: enabledSkillIds }),
+        body: JSON.stringify({ messages: apiMessages, model, personality_id: personalityId, skills: enabledSkillIds }),
         signal: controller.signal,
       });
       if (resp.status === 429) { toast.error("Rate limit exceeded. Please try again later."); setIsStreaming(false); return; }
