@@ -699,7 +699,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         const agentRunId = await lsCreateRun({
           name: `agent:${ar.agentName}`,
           run_type: "llm",
-          inputs: { agent_id: ar.agentId, user_message: lastUserMsg.slice(0, 200) },
+          inputs: { agent_id: ar.agentId, user_message: lastUserText.slice(0, 200) },
           parent_run_id: councilRunId || undefined,
           extra: { metadata: { latency_ms: ar.latencyMs } },
         });
