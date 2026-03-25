@@ -654,7 +654,10 @@ ${enabledSkills.includes("browser") ? "\nYou can browse specific web pages to ex
 
 When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.${memoryContext}`;
 
-    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content || "";
+    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop();
+    const lastUserText = Array.isArray(lastUserMsg?.content)
+      ? lastUserMsg.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join(" ")
+      : (lastUserMsg?.content || "");
 
     const finalSystemPrompt = systemPrompt;
     const fullMessages = [{ role: "system", content: finalSystemPrompt }, ...messages];
