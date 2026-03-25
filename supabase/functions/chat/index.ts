@@ -687,7 +687,7 @@ When you use a tool and get results, synthesize the information into a helpful r
 
       const councilResult = await runCouncil(
         councilDecision.agents,
-        lastUserMsg,
+        lastUserText,
         conversationContext,
         finalSystemPrompt,
         LOVABLE_API_KEY,
