@@ -115,7 +115,13 @@ export function useChatStreaming(
     if (isStreaming) return;
     const validation = messageSchema.safeParse(text);
     if (!validation.success) { toast.error(validation.error.errors[0].message); return; }
-    const userMsg: Msg = { role: "user", content: text };
+    // Build content with optional images prepended as markdown
+    let displayContent = text;
+    if (imageUrls && imageUrls.length > 0) {
+      const imageMarkdown = imageUrls.map((url) => `![image](${url})`).join("\n");
+      displayContent = imageMarkdown + (text ? "\n\n" + text : "");
+    }
+    const userMsg: Msg = { role: "user", content: displayContent };
     if (!overrideInput && setInput) setInput("");
     let convId = activeConv;
     if (!convId) { convId = await createConversation(model, personalityId); if (!convId) return; }
