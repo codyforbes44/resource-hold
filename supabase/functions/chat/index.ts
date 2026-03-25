@@ -674,7 +674,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         inputs: {
           agents: councilDecision.agents.map((a) => a.id),
           reason: councilDecision.reason,
-          user_message: lastUserMsg.slice(0, 200),
+          user_message: lastUserText.slice(0, 200),
         },
         parent_run_id: parentRunId || undefined,
         extra: { metadata: {} },
