@@ -494,10 +494,25 @@ function validateAndSanitize(messages: any[]): any[] {
   const truncated = messages.slice(-MAX_HISTORY_MESSAGES);
 
   return truncated.map((msg) => {
-    if (!msg.role || !msg.content) throw new Error("Each message must have role and content");
+    if (!msg.role || msg.content === undefined) throw new Error("Each message must have role and content");
     if (!["user", "assistant", "system"].includes(msg.role)) {
       throw new Error(`Invalid role: ${msg.role}`);
     }
+
+    // Support multimodal content arrays (e.g. image_url + text parts)
+    if (Array.isArray(msg.content)) {
+      const sanitizedParts = msg.content.map((part: any) => {
+        if (part.type === "text") {
+          return { type: "text", text: String(part.text || "").slice(0, MAX_MESSAGE_LENGTH) };
+        }
+        if (part.type === "image_url" && part.image_url?.url) {
+          return { type: "image_url", image_url: { url: String(part.image_url.url) } };
+        }
+        return null;
+      }).filter(Boolean);
+      return { role: msg.role, content: sanitizedParts };
+    }
+
     const content = typeof msg.content === "string"
       ? msg.content.slice(0, MAX_MESSAGE_LENGTH)
       : String(msg.content).slice(0, MAX_MESSAGE_LENGTH);
@@ -639,13 +654,16 @@ ${enabledSkills.includes("browser") ? "\nYou can browse specific web pages to ex
 
 When you use a tool and get results, synthesize the information into a helpful response. Cite sources when using web search results.${memoryContext}`;
 
-    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop()?.content || "";
+    const lastUserMsg = messages.filter((m: any) => m.role === "user").pop();
+    const lastUserText = Array.isArray(lastUserMsg?.content)
+      ? lastUserMsg.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join(" ")
+      : (lastUserMsg?.content || "");
 
     const finalSystemPrompt = systemPrompt;
     const fullMessages = [{ role: "system", content: finalSystemPrompt }, ...messages];
 
     // ── Agent Council routing ──
-    const councilDecision = routeQuery(lastUserMsg, enabledSkills);
+    const councilDecision = routeQuery(lastUserText, enabledSkills);
     console.log(`Council decision: ${councilDecision.reason} (useCouncil: ${councilDecision.useCouncil})`);
 
     // ── Council path: multi-agent deliberation ──
@@ -656,7 +674,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         inputs: {
           agents: councilDecision.agents.map((a) => a.id),
           reason: councilDecision.reason,
-          user_message: lastUserMsg.slice(0, 200),
+          user_message: lastUserText.slice(0, 200),
         },
         parent_run_id: parentRunId || undefined,
         extra: { metadata: {} },
@@ -669,7 +687,7 @@ When you use a tool and get results, synthesize the information into a helpful r
 
       const councilResult = await runCouncil(
         councilDecision.agents,
-        lastUserMsg,
+        lastUserText,
         conversationContext,
         finalSystemPrompt,
         LOVABLE_API_KEY,
@@ -681,7 +699,7 @@ When you use a tool and get results, synthesize the information into a helpful r
         const agentRunId = await lsCreateRun({
           name: `agent:${ar.agentName}`,
           run_type: "llm",
-          inputs: { agent_id: ar.agentId, user_message: lastUserMsg.slice(0, 200) },
+          inputs: { agent_id: ar.agentId, user_message: lastUserText.slice(0, 200) },
           parent_run_id: councilRunId || undefined,
           extra: { metadata: { latency_ms: ar.latencyMs } },
         });

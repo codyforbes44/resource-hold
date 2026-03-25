@@ -109,12 +109,19 @@ export function useChatStreaming(
     finally { setIsStreaming(false); abortRef.current = null; }
   };
 
-  const send = useCallback(async (overrideInput?: string, inputState?: string, setInput?: (v: string) => void) => {
+  const send = useCallback(async (overrideInput?: string, inputState?: string, setInput?: (v: string) => void, imageUrls?: string[]) => {
     const text = (overrideInput || inputState || "").trim();
-    if (!text || isStreaming) return;
+    if (!text && (!imageUrls || imageUrls.length === 0)) return;
+    if (isStreaming) return;
     const validation = messageSchema.safeParse(text);
     if (!validation.success) { toast.error(validation.error.errors[0].message); return; }
-    const userMsg: Msg = { role: "user", content: text };
+    // Build content with optional images prepended as markdown
+    let displayContent = text;
+    if (imageUrls && imageUrls.length > 0) {
+      const imageMarkdown = imageUrls.map((url) => `![image](${url})`).join("\n");
+      displayContent = imageMarkdown + (text ? "\n\n" + text : "");
+    }
+    const userMsg: Msg = { role: "user", content: displayContent };
     if (!overrideInput && setInput) setInput("");
     let convId = activeConv;
     if (!convId) { convId = await createConversation(model, personalityId); if (!convId) return; }
@@ -126,9 +133,25 @@ export function useChatStreaming(
     const controller = new AbortController();
     abortRef.current = controller;
     try {
+      // Build API messages, converting image markdown to multimodal content
+      const apiMessages = allMessages.map((m) => {
+        if (m.role === "user" && m.content.includes("![image](")) {
+          const parts: any[] = [];
+          const imgRegex = /!\[image\]\(([^)]+)\)/g;
+          let match;
+          while ((match = imgRegex.exec(m.content)) !== null) {
+            parts.push({ type: "image_url", image_url: { url: match[1] } });
+          }
+          const textOnly = m.content.replace(/!\[image\]\([^)]+\)\n*/g, "").trim();
+          if (textOnly) parts.push({ type: "text", text: textOnly });
+          return { role: m.role, content: parts };
+        }
+        return m;
+      });
+
       const resp = await fetch(CHAT_URL, {
         method: "POST", headers: await buildHeaders(),
-        body: JSON.stringify({ messages: allMessages, model, personality_id: personalityId, skills: enabledSkillIds }),
+        body: JSON.stringify({ messages: apiMessages, model, personality_id: personalityId, skills: enabledSkillIds }),
         signal: controller.signal,
       });
       if (resp.status === 429) { toast.error("Rate limit exceeded. Please try again later."); setIsStreaming(false); return; }
