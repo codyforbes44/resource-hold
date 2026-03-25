@@ -19,6 +19,8 @@ import { useTTS } from "@/hooks/useTTS";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import ChatMessages from "@/components/chat/ChatMessages";
 import ChatInput from "@/components/chat/ChatInput";
+import type { AttachedImage } from "@/components/chat/ChatInput";
+import { uploadChatImages } from "@/hooks/useImageUpload";
 import PersonalitySelector from "@/components/chat/PersonalitySelector";
 
 const VoiceAgent = lazy(() => import("@/components/chat/VoiceAgent"));
