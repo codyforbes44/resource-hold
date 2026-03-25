@@ -79,7 +79,7 @@ const ChatInput = ({
         return false;
       }
       if (f.size > MAX_IMAGE_SIZE) {
-        toast.error(`${f.name} exceeds 5MB limit`);
+        toast.error(`${f.name} exceeds 10MB limit`);
         return false;
       }
       return true;
