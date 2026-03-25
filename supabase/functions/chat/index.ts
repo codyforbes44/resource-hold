@@ -494,10 +494,25 @@ function validateAndSanitize(messages: any[]): any[] {
   const truncated = messages.slice(-MAX_HISTORY_MESSAGES);
 
   return truncated.map((msg) => {
-    if (!msg.role || !msg.content) throw new Error("Each message must have role and content");
+    if (!msg.role || msg.content === undefined) throw new Error("Each message must have role and content");
     if (!["user", "assistant", "system"].includes(msg.role)) {
       throw new Error(`Invalid role: ${msg.role}`);
     }
+
+    // Support multimodal content arrays (e.g. image_url + text parts)
+    if (Array.isArray(msg.content)) {
+      const sanitizedParts = msg.content.map((part: any) => {
+        if (part.type === "text") {
+          return { type: "text", text: String(part.text || "").slice(0, MAX_MESSAGE_LENGTH) };
+        }
+        if (part.type === "image_url" && part.image_url?.url) {
+          return { type: "image_url", image_url: { url: String(part.image_url.url) } };
+        }
+        return null;
+      }).filter(Boolean);
+      return { role: msg.role, content: sanitizedParts };
+    }
+
     const content = typeof msg.content === "string"
       ? msg.content.slice(0, MAX_MESSAGE_LENGTH)
       : String(msg.content).slice(0, MAX_MESSAGE_LENGTH);
