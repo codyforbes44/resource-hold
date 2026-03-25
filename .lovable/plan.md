@@ -1,52 +1,54 @@
 
 
-## AGI Research Plan: Knowledge Base + Project Tracker
+## Image Upload in Chat
 
-### Part 1: Ingest Plan as Knowledge Base Document
+### What we're building
+Add the ability to attach images to chat messages. Users can upload photos (e.g., screenshots of issues) that get sent alongside their text message. The AI model will see the image and can analyze/respond to it.
 
-Use `lov-exec` to write the full AGI research plan as a `.txt` file and upload it to the `knowledge_documents` storage bucket, then insert a record and trigger chunking/embedding via the `knowledge-upload` edge function. Same process used for the TIMP document.
+### How it works
 
-### Part 2: Build Research Tracker Page
+**1. ChatInput — Add image attachment button and preview**
+- Add a paperclip/image button next to the textarea
+- Hidden `<input type="file" accept="image/*">` triggered on click
+- State for attached images (array of `{ file: File, preview: string }`)
+- Show thumbnail previews above the textarea with remove buttons
+- Max 4 images, max 5MB each
+- Update `onSend` prop to pass images along with text
 
-Create a new `/research` page (admin-gated) with a visual phase tracker for the 4-phase AGI plan.
+**2. Upload images to storage on send**
+- Upload each attached image to the existing `chat_images` bucket (already public)
+- Path: `{user_id}/{conversation_id}/{timestamp}-{filename}`
+- Get the public URL after upload
+- For guests: convert to base64 data URLs (no storage access)
 
-**Database: `research_milestones` table**
+**3. Update message format to support images**
+- Extend `Msg` type in `useConversations.ts` to include optional `images?: string[]` (array of URLs)
+- When sending to the chat edge function, format messages with images using the multimodal content format: `content: [{ type: "text", text: "..." }, { type: "image_url", image_url: { url: "..." } }]`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| phase | integer | 1-4 |
-| phase_title | text | e.g. "Foundational Research" |
-| milestone_title | text | e.g. "Define AGI Criteria" |
-| description | text | Deliverable description |
-| status | text | `not_started`, `in_progress`, `completed`, `blocked` |
-| notes | text | Free-form progress notes |
-| sort_order | integer | Ordering within phase |
-| created_at, updated_at | timestamptz | Defaults |
+**4. Update chat edge function**
+- Already uses OpenAI-compatible format; multimodal content arrays are natively supported by Gemini models via the Lovable AI gateway
+- Pass through the content array as-is to the model endpoint
+- No major changes needed — just ensure content arrays aren't stringified incorrectly
 
-RLS: Admin-only read/write via `has_role()`.
+**5. Display images in ChatMessages**
+- For user messages containing images, render thumbnails above the text
+- Clicking a thumbnail opens a larger preview (dialog/modal)
+- Images stored as markdown `![](url)` in message content, or as separate field
 
-**New files:**
-- `src/pages/Research.tsx` — Phase-based tracker with expandable milestones, status badges, progress bars per phase
-- Route added to `App.tsx` as admin-gated `/research`
-- Nav link added to `AppShell.tsx`
+**6. Persist image URLs in messages table**
+- Store image URLs inline in the message content as markdown images, or add an `images` jsonb column
+- Simplest approach: prepend `![image](url)\n` to the message content before saving — works with existing markdown renderer
 
-**UI design:**
-- 4 phase cards in a vertical layout, each showing a progress bar (% milestones completed)
-- Expandable accordion per phase listing milestones with status badges
-- Inline status dropdown to update milestone status
-- Notes textarea for each milestone
-- Color-coded: not_started (gray), in_progress (blue), completed (green), blocked (red)
+### Files to modify
+- `src/components/chat/ChatInput.tsx` — attachment button, preview strip, file handling
+- `src/pages/Chat.tsx` — pass image upload handler, wire up storage upload
+- `src/hooks/useChatStreaming.ts` — format messages with image content for API
+- `src/components/chat/ChatMessages.tsx` — render images in user messages
+- `supabase/functions/chat/index.ts` — ensure multimodal content passthrough
 
-**Seed data:** Pre-populate all 20 milestones from the 4-phase plan via SQL insert.
-
-### Files Changed
-
-| File | Action |
-|------|--------|
-| Knowledge base | Ingest AGI plan `.txt` via edge function |
-| Migration | Create `research_milestones` table + RLS + seed data |
-| `src/pages/Research.tsx` | New tracker page |
-| `src/App.tsx` | Add `/research` route |
-| `src/components/AppShell.tsx` | Add nav link |
+### Technical details
+- Uses existing `chat_images` public storage bucket
+- Gemini models support multimodal input via OpenAI-compatible `image_url` content parts
+- Images are uploaded to storage first, then public URLs are sent to the model
+- The `content` field in the API request becomes an array instead of a string when images are present
 
