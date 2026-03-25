@@ -663,7 +663,7 @@ When you use a tool and get results, synthesize the information into a helpful r
     const fullMessages = [{ role: "system", content: finalSystemPrompt }, ...messages];
 
     // ── Agent Council routing ──
-    const councilDecision = routeQuery(lastUserMsg, enabledSkills);
+    const councilDecision = routeQuery(lastUserText, enabledSkills);
     console.log(`Council decision: ${councilDecision.reason} (useCouncil: ${councilDecision.useCouncil})`);
 
     // ── Council path: multi-agent deliberation ──
