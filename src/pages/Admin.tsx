@@ -14,11 +14,12 @@ import AppShell from "@/components/AppShell";
 import KnowledgeBaseTab from "@/components/admin/KnowledgeBaseTab";
 
 import PersonalitiesTab from "@/components/admin/PersonalitiesTab";
+import TaskadeTab from "@/components/admin/TaskadeTab";
 import { toast } from "sonner";
 import {
   Users, MessageSquare, ClipboardList, BarChart3, Search,
   Shield, ShieldCheck, Cpu, Globe, UserCog, Eye, BookOpen, Sparkles,
-  ExternalLink, Activity,
+  ExternalLink, Activity, CheckSquare,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -184,6 +185,9 @@ const Admin = () => {
           <TabsTrigger value="personalities" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <Sparkles className="h-4 w-4 hidden sm:block" /> Personas
           </TabsTrigger>
+          <TabsTrigger value="taskade" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
+            <CheckSquare className="h-4 w-4 hidden sm:block" /> Taskade
+          </TabsTrigger>
           <TabsTrigger value="conversations" className="gap-1.5 text-xs sm:text-sm min-h-[44px] flex-shrink-0">
             <MessageSquare className="h-4 w-4 hidden sm:block" /> Chats
           </TabsTrigger>
@@ -323,6 +327,11 @@ const Admin = () => {
           />
         </TabsContent>
 
+
+        {/* Taskade Tab */}
+        <TabsContent value="taskade">
+          <TaskadeTab />
+        </TabsContent>
 
         {/* Conversations Tab */}
         <TabsContent value="conversations" className="space-y-4">
