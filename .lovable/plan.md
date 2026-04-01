@@ -1,54 +1,67 @@
 
+Goal: extend the current chat attachment flow from image-only to general attachments so signed-in users can upload MP4 files for video-editing requests, while keeping existing image support.
 
-## Image Upload in Chat
+1. Generalize the attachment model
+- Replace the image-specific types/state (`AttachedImage`, `uploadChatImages`) with a shared attachment model like `ChatAttachment`.
+- Support at least:
+  - images: existing behavior
+  - videos: `video/mp4`
+- Keep guest image behavior as-is, but require sign-in before allowing MP4 uploads.
 
-### What we're building
-Add the ability to attach images to chat messages. Users can upload photos (e.g., screenshots of issues) that get sent alongside their text message. The AI model will see the image and can analyze/respond to it.
+2. Update the chat input UI
+- Change the file picker to accept images plus `.mp4`.
+- Show attachment cards instead of image-only thumbnails:
+  - image preview for photos
+  - small video preview/player or video badge for MP4
+- Add validation and messaging for unsupported file types and video-size limits.
+- If a guest selects MP4, show a sign-in prompt instead of uploading.
 
-### How it works
+3. Persist attachments cleanly
+- Add an `attachments` JSON column to chat messages instead of encoding files into markdown.
+- Store metadata like:
+  - `type` (`image` | `video`)
+  - `url`
+  - `name`
+  - `mimeType`
+- Keep `content` as the user’s text prompt so text and attachments stay separate.
 
-**1. ChatInput — Add image attachment button and preview**
-- Add a paperclip/image button next to the textarea
-- Hidden `<input type="file" accept="image/*">` triggered on click
-- State for attached images (array of `{ file: File, preview: string }`)
-- Show thumbnail previews above the textarea with remove buttons
-- Max 4 images, max 5MB each
-- Update `onSend` prop to pass images along with text
+4. Rework upload handling
+- Reuse the existing public storage bucket and authenticated folder-based upload pattern.
+- Rename the upload helper to something attachment-oriented and return structured attachment metadata.
+- Continue converting guest images to base64 only if needed, but block guest MP4 uploads entirely.
 
-**2. Upload images to storage on send**
-- Upload each attached image to the existing `chat_images` bucket (already public)
-- Path: `{user_id}/{conversation_id}/{timestamp}-{filename}`
-- Get the public URL after upload
-- For guests: convert to base64 data URLs (no storage access)
+5. Update chat rendering
+- Render user-message attachments above the text bubble:
+  - images as thumbnails
+  - MP4 with inline preview / open-in-new-tab / download action
+- Keep assistant rendering unchanged.
+- Load historical attachments from the database so uploaded videos still appear after refresh.
 
-**3. Update message format to support images**
-- Extend `Msg` type in `useConversations.ts` to include optional `images?: string[]` (array of URLs)
-- When sending to the chat edge function, format messages with images using the multimodal content format: `content: [{ type: "text", text: "..." }, { type: "image_url", image_url: { url: "..." } }]`
+6. Adjust chat request formatting
+- For images: continue converting them into multimodal parts for the chat function.
+- For MP4: do not send raw video into the current chat model path; instead include a short attachment summary in the user request payload so the assistant knows a video was attached.
+- This keeps the existing chat function compatible while preparing for a future dedicated video-editing backend flow.
 
-**4. Update chat edge function**
-- Already uses OpenAI-compatible format; multimodal content arrays are natively supported by Gemini models via the Lovable AI gateway
-- Pass through the content array as-is to the model endpoint
-- No major changes needed — just ensure content arrays aren't stringified incorrectly
+7. Update the chat edge function safely
+- Keep current multimodal image support.
+- Ensure validation accepts the new attachment-aware request shape or attachment summaries without breaking existing chats.
+- Do not attempt raw MP4 ingestion in the current model route unless a dedicated supported video-processing path is added later.
 
-**5. Display images in ChatMessages**
-- For user messages containing images, render thumbnails above the text
-- Clicking a thumbnail opens a larger preview (dialog/modal)
-- Images stored as markdown `![](url)` in message content, or as separate field
+Technical details
+- Files likely affected:
+  - `src/components/chat/ChatInput.tsx`
+  - `src/hooks/useImageUpload.ts` → generalized upload helper
+  - `src/pages/Chat.tsx`
+  - `src/hooks/useChatStreaming.ts`
+  - `src/hooks/useConversations.ts`
+  - `src/components/chat/ChatMessages.tsx`
+  - `supabase/functions/chat/index.ts`
+  - new SQL migration for `messages.attachments`
+- Backend/storage:
+  - no new auth model needed
+  - existing authenticated storage policy pattern should still work
+  - RLS on `messages` remains the same; only schema expands
 
-**6. Persist image URLs in messages table**
-- Store image URLs inline in the message content as markdown images, or add an `images` jsonb column
-- Simplest approach: prepend `![image](url)\n` to the message content before saving — works with existing markdown renderer
-
-### Files to modify
-- `src/components/chat/ChatInput.tsx` — attachment button, preview strip, file handling
-- `src/pages/Chat.tsx` — pass image upload handler, wire up storage upload
-- `src/hooks/useChatStreaming.ts` — format messages with image content for API
-- `src/components/chat/ChatMessages.tsx` — render images in user messages
-- `supabase/functions/chat/index.ts` — ensure multimodal content passthrough
-
-### Technical details
-- Uses existing `chat_images` public storage bucket
-- Gemini models support multimodal input via OpenAI-compatible `image_url` content parts
-- Images are uploaded to storage first, then public URLs are sent to the model
-- The `content` field in the API request becomes an array instead of a string when images are present
-
+Important scope note
+- This plan adds MP4 upload, storage, persistence, and chat-side preview/reference.
+- Actual AI-powered video editing/transformation should be implemented as a separate next step using a dedicated backend workflow, because the current chat endpoint is image-aware but not a full raw-video editing pipeline.
