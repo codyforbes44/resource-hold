@@ -80,7 +80,7 @@ const ChatInput = ({
       return;
     }
 
-    const validFiles = files.slice(0, remaining).flatMap((file) => {
+    const validFiles: PendingAttachment[] = files.slice(0, remaining).flatMap((file) => {
       const attachmentType = getAttachmentType(file.type);
       if (!attachmentType) {
         toast.error(`${file.name} is not a supported image or MP4 file`);
@@ -88,7 +88,7 @@ const ChatInput = ({
       }
       if (attachmentType === "video" && isGuest) {
         toast.error("Sign in to attach MP4 files");
-        return false;
+        return [];
       }
       const sizeLimit = attachmentType === "video" ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
       if (file.size > sizeLimit) {
