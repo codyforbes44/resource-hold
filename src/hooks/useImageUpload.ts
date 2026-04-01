@@ -1,46 +1,56 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { AttachedImage } from "@/components/chat/ChatInput";
+import type { ChatAttachment, PendingAttachment } from "@/lib/chat-attachments";
 import type { User } from "@supabase/supabase-js";
 
 /**
- * Upload attached images to storage (authenticated) or convert to base64 (guest).
- * Returns array of public URLs or data URIs.
+ * Upload attached files to storage (authenticated) or convert guest images to data URIs.
  */
-export async function uploadChatImages(
-  images: AttachedImage[],
+export async function uploadChatAttachments(
+  attachments: PendingAttachment[],
   user: User | null,
   conversationId: string
-): Promise<string[]> {
-  if (images.length === 0) return [];
+): Promise<ChatAttachment[]> {
+  if (attachments.length === 0) return [];
 
   if (user) {
-    const urls: string[] = [];
-    for (const img of images) {
+    const uploaded: ChatAttachment[] = [];
+    for (const attachment of attachments) {
       const timestamp = Date.now();
-      const safeName = img.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const safeName = attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${user.id}/${conversationId}/${timestamp}-${safeName}`;
       const { error } = await supabase.storage
         .from("chat_images")
-        .upload(path, img.file, { contentType: img.file.type, upsert: false });
+        .upload(path, attachment.file, { contentType: attachment.file.type, upsert: false });
       if (error) {
-        console.error("Image upload error:", error);
+        console.error("Attachment upload error:", error);
         continue;
       }
       const { data: urlData } = supabase.storage.from("chat_images").getPublicUrl(path);
-      urls.push(urlData.publicUrl);
+      uploaded.push({
+        type: attachment.type,
+        url: urlData.publicUrl,
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+      });
     }
-    return urls;
+    return uploaded;
   } else {
-    // Guest: convert to base64 data URIs
-    const promises = images.map(
-      (img) =>
-        new Promise<string>((resolve) => {
+    const promises = attachments
+      .filter((attachment) => attachment.type === "image")
+      .map(
+        (attachment) =>
+          new Promise<ChatAttachment | null>((resolve) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => resolve("");
-          reader.readAsDataURL(img.file);
+          reader.onload = () => resolve({
+            type: attachment.type,
+            url: reader.result as string,
+            name: attachment.name,
+            mimeType: attachment.mimeType,
+          });
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(attachment.file);
         })
-    );
-    return (await Promise.all(promises)).filter(Boolean);
+      );
+    return (await Promise.all(promises)).filter((attachment): attachment is ChatAttachment => Boolean(attachment));
   }
 }

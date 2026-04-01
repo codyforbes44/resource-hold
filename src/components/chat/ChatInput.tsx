@@ -4,20 +4,21 @@ import { Send, Volume2, VolumeX, Paperclip, X } from "lucide-react";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { Skill } from "@/components/chat/SkillsPanel";
+import { getAttachmentType, type PendingAttachment } from "@/lib/chat-attachments";
 
 const MAX_MESSAGE_LENGTH = 10000;
-const MAX_IMAGES = 4;
+const MAX_ATTACHMENTS = 4;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-
-export type AttachedImage = { file: File; preview: string };
+const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
 
 interface ChatInputProps {
   input: string;
   setInput: (v: string) => void;
-  onSend: (images?: AttachedImage[]) => void;
+  onSend: (attachments?: PendingAttachment[]) => void;
   isStreaming: boolean;
   enabledSkillIds: string[];
   skills: Skill[];
+  isGuest: boolean;
   autoReadEnabled: boolean;
   setAutoReadEnabled: (v: boolean | ((prev: boolean) => boolean)) => void;
 }
@@ -29,14 +30,20 @@ const ChatInput = ({
   isStreaming,
   enabledSkillIds,
   skills,
+  isGuest,
   autoReadEnabled,
   setAutoReadEnabled,
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const attachmentsRef = useRef<PendingAttachment[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<PendingAttachment[]>([]);
   const charsRemaining = MAX_MESSAGE_LENGTH - input.length;
   const showCharCount = input.length > MAX_MESSAGE_LENGTH * 0.8;
+
+  useEffect(() => {
+    attachmentsRef.current = attachedFiles;
+  }, [attachedFiles]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -54,46 +61,54 @@ const ChatInput = ({
         handleSend();
       }
     },
-    [input, attachedImages, isStreaming]
+    [input, attachedFiles, isStreaming]
   );
 
   const handleSend = () => {
-    if (isStreaming || (!input.trim() && attachedImages.length === 0)) return;
-    onSend(attachedImages.length > 0 ? attachedImages : undefined);
-    setAttachedImages([]);
+    if (isStreaming || (!input.trim() && attachedFiles.length === 0)) return;
+    onSend(attachedFiles.length > 0 ? attachedFiles : undefined);
+    setAttachedFiles([]);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
 
-    const remaining = MAX_IMAGES - attachedImages.length;
+    const remaining = MAX_ATTACHMENTS - attachedFiles.length;
     if (remaining <= 0) {
-      toast.error(`Maximum ${MAX_IMAGES} images allowed`);
+      toast.error(`Maximum ${MAX_ATTACHMENTS} attachments allowed`);
       return;
     }
 
-    const validFiles = files.slice(0, remaining).filter((f) => {
-      if (!f.type.startsWith("image/")) {
-        toast.error(`${f.name} is not an image`);
-        return false;
+    const validFiles: PendingAttachment[] = files.slice(0, remaining).flatMap((file) => {
+      const attachmentType = getAttachmentType(file.type);
+      if (!attachmentType) {
+        toast.error(`${file.name} is not a supported image or MP4 file`);
+        return [];
       }
-      if (f.size > MAX_IMAGE_SIZE) {
-        toast.error(`${f.name} exceeds 10MB limit`);
-        return false;
+      if (attachmentType === "video" && isGuest) {
+        toast.error("Sign in to attach MP4 files");
+        return [];
       }
-      return true;
+      const sizeLimit = attachmentType === "video" ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+      if (file.size > sizeLimit) {
+        toast.error(`${file.name} exceeds ${attachmentType === "video" ? "20MB" : "10MB"} limit`);
+        return [];
+      }
+      return [{
+        file,
+        preview: URL.createObjectURL(file),
+        type: attachmentType,
+        name: file.name,
+        mimeType: file.type,
+      }];
     });
 
-    const newImages = validFiles.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setAttachedImages((prev) => [...prev, ...newImages]);
+    setAttachedFiles((prev) => [...prev, ...validFiles]);
   };
 
-  const removeImage = (idx: number) => {
-    setAttachedImages((prev) => {
+  const removeAttachment = (idx: number) => {
+    setAttachedFiles((prev) => {
       URL.revokeObjectURL(prev[idx].preview);
       return prev.filter((_, i) => i !== idx);
     });
@@ -102,7 +117,7 @@ const ChatInput = ({
   // Cleanup object URLs on unmount
   useEffect(() => {
     return () => {
-      attachedImages.forEach((img) => URL.revokeObjectURL(img.preview));
+      attachmentsRef.current.forEach((attachment) => URL.revokeObjectURL(attachment.preview));
     };
   }, []);
 
@@ -122,16 +137,20 @@ const ChatInput = ({
         </div>
       )}
 
-      {/* Image previews */}
-      {attachedImages.length > 0 && (
+      {/* Attachment previews */}
+      {attachedFiles.length > 0 && (
         <div className="flex gap-2 pb-2 mb-2 overflow-x-auto">
-          {attachedImages.map((img, idx) => (
+          {attachedFiles.map((attachment, idx) => (
             <div key={idx} className="relative shrink-0 h-16 w-16 rounded-md overflow-hidden border border-border">
-              <img src={img.preview} alt={`Attachment ${idx + 1}`} className="h-full w-full object-cover" />
+              {attachment.type === "image" ? (
+                <img src={attachment.preview} alt={attachment.name} className="h-full w-full object-cover" />
+              ) : (
+                <video src={attachment.preview} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+              )}
               <button
-                onClick={() => removeImage(idx)}
+                onClick={() => removeAttachment(idx)}
                 className="absolute top-0 right-0 bg-background/80 rounded-bl-md p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                aria-label="Remove image"
+                aria-label="Remove attachment"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -146,16 +165,16 @@ const ChatInput = ({
           variant="ghost"
           size="icon"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isStreaming || attachedImages.length >= MAX_IMAGES}
+          disabled={isStreaming || attachedFiles.length >= MAX_ATTACHMENTS}
           className="min-h-[44px] min-w-[44px] shrink-0"
-          title="Attach images"
+          title="Attach image or MP4"
         >
           <Paperclip className="h-4 w-4" />
         </Button>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/mp4"
           multiple
           onChange={handleFileSelect}
           className="hidden"
@@ -199,7 +218,7 @@ const ChatInput = ({
         <Button
           type="button"
           onClick={handleSend}
-          disabled={isStreaming || (!input.trim() && attachedImages.length === 0)}
+          disabled={isStreaming || (!input.trim() && attachedFiles.length === 0)}
           className="min-h-[44px] min-w-[44px]"
         >
           <Send className="h-4 w-4" />
