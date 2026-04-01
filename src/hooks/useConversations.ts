@@ -5,10 +5,34 @@ import {
   loadLocalConversations, saveLocalConversations, loadLocalMessages,
   saveLocalMessages, deleteLocalConversation, clearLocalChatData,
 } from "@/lib/chat-storage";
+import {
+  extractLegacyImageAttachments,
+  normalizeAttachments,
+  type ChatAttachment,
+} from "@/lib/chat-attachments";
 import type { User } from "@supabase/supabase-js";
 
 export type Conversation = { id: string; title: string; model: string; personality_id?: string | null; created_at: string };
-export type Msg = { role: "user" | "assistant"; content: string };
+export type Msg = { role: "user" | "assistant"; content: string; attachments?: ChatAttachment[] };
+
+const hydrateMessage = (message: { role: "user" | "assistant"; content: string; attachments?: unknown }): Msg => {
+  const attachments = normalizeAttachments(message.attachments);
+
+  if (message.role === "user" && attachments.length === 0 && message.content.includes("![image](")) {
+    const legacy = extractLegacyImageAttachments(message.content);
+    return {
+      role: message.role,
+      content: legacy.content,
+      attachments: legacy.attachments.length > 0 ? legacy.attachments : undefined,
+    };
+  }
+
+  return {
+    role: message.role,
+    content: message.content,
+    attachments: attachments.length > 0 ? attachments : undefined,
+  };
+};
 
 export function useConversations(user: User | null, defaultModel: string) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -42,7 +66,19 @@ export function useConversations(user: User | null, defaultModel: string) {
         const localMsgs = loadLocalMessages(conv.id);
         const { data: newConv, error } = await supabase.from("conversations").insert({ user_id: user.id, title: conv.title, model: conv.model }).select().single();
         if (error || !newConv) continue;
-        if (localMsgs.length > 0) await supabase.from("messages").insert(localMsgs.map((m) => ({ conversation_id: newConv.id, role: m.role, content: m.content })));
+        if (localMsgs.length > 0) {
+          await supabase.from("messages").insert(
+            localMsgs.map((m) => {
+              const hydrated = hydrateMessage(m);
+              return {
+                conversation_id: newConv.id,
+                role: hydrated.role,
+                content: hydrated.content,
+                attachments: hydrated.attachments ?? [],
+              };
+            }) as any
+          );
+        }
         migrated++;
       }
       clearLocalChatData();
@@ -61,9 +97,9 @@ export function useConversations(user: User | null, defaultModel: string) {
     if (!convId) { setMessages([]); return; }
     if (user) {
       supabase.from("messages").select("*").eq("conversation_id", convId).order("created_at", { ascending: true })
-        .then(({ data }) => { if (data) setMessages(data.map((m: any) => ({ role: m.role, content: m.content }))); });
+        .then(({ data }) => { if (data) setMessages(data.map((m: any) => hydrateMessage(m))); });
     } else {
-      setMessages(loadLocalMessages(convId));
+      setMessages(loadLocalMessages(convId).map((message) => hydrateMessage(message)));
     }
   };
 

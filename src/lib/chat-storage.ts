@@ -1,4 +1,6 @@
-type Msg = { role: "user" | "assistant"; content: string };
+import type { ChatAttachment } from "@/lib/chat-attachments";
+
+type Msg = { role: "user" | "assistant"; content: string; attachments?: ChatAttachment[] };
 type Conversation = { id: string; title: string; model: string; created_at: string };
 
 const LS_CONVOS_KEY = "gclaw_conversations";

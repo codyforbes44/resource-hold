@@ -4,12 +4,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, LogIn } from "lucide-react";
 import MessageActions from "@/components/chat/MessageActions";
+import ChatMessageAttachments from "@/components/chat/ChatMessageAttachments";
 import type { Skill } from "@/components/chat/SkillsPanel";
+import type { Msg } from "@/hooks/useConversations";
 import logoSrc from "@/assets/logo-gclaw.png";
 
 const MarkdownRenderer = lazy(() => import("@/components/chat/MarkdownRenderer"));
-
-type Msg = { role: "user" | "assistant"; content: string };
 
 const SUGGESTED_PROMPTS = [
   "Explain quantum computing in simple terms",
@@ -157,6 +157,9 @@ const ChatMessages = ({
             onClick={() => handleMessageTap(i)}
           >
             <div className="relative max-w-[90%] md:max-w-[80%]">
+              {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (
+                <ChatMessageAttachments attachments={msg.attachments} />
+              )}
               <div
                 className={`rounded-xl px-4 py-3 text-sm ${
                   msg.role === "user"
@@ -169,7 +172,7 @@ const ChatMessages = ({
                     <MarkdownRenderer content={msg.content} />
                   </Suspense>
                 ) : (
-                  msg.content
+                  msg.content || <span className="text-primary-foreground/80">Attachment</span>
                 )}
               </div>
               <MessageActions

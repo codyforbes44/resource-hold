@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { messageSchema } from "@/lib/validations";
 import { getAccessToken } from "@/lib/supabase-helpers";
 import { saveLocalConversations, saveLocalMessages } from "@/lib/chat-storage";
+import { describeVideoAttachments, extractLegacyImageAttachments, type ChatAttachment } from "@/lib/chat-attachments";
 import type { User } from "@supabase/supabase-js";
 import type { Msg, Conversation } from "./useConversations";
 
@@ -25,6 +26,34 @@ export function useChatStreaming(
   onStreamComplete?: (content: string) => void,
 ) {
   const abortRef = useRef<AbortController | null>(null);
+
+  const toApiMessage = (message: Msg) => {
+    const attachments = message.attachments ?? [];
+
+    if (attachments.length === 0 && message.role === "user" && message.content.includes("![image](")) {
+      const legacy = extractLegacyImageAttachments(message.content);
+      const contentParts = [
+        ...legacy.attachments.map((attachment) => ({ type: "image_url", image_url: { url: attachment.url } })),
+        ...(legacy.content ? [{ type: "text", text: legacy.content }] : []),
+      ];
+      return contentParts.length > 0 ? { role: message.role, content: contentParts } : message;
+    }
+
+    if (attachments.length === 0) return message;
+
+    const contentParts: Array<{ type: "image_url"; image_url: { url: string } } | { type: "text"; text: string }> = [
+      ...attachments
+        .filter((attachment) => attachment.type === "image")
+        .map((attachment) => ({ type: "image_url" as const, image_url: { url: attachment.url } })),
+    ];
+
+    const textSegments = [message.content.trim(), describeVideoAttachments(attachments)].filter(Boolean);
+    if (textSegments.length > 0) {
+      contentParts.push({ type: "text", text: textSegments.join("\n\n") });
+    }
+
+    return contentParts.length > 0 ? { role: message.role, content: contentParts } : message;
+  };
 
   const processStream = async (resp: Response, onContent: (content: string) => void): Promise<string> => {
     const reader = resp.body!.getReader();
@@ -109,23 +138,26 @@ export function useChatStreaming(
     finally { setIsStreaming(false); abortRef.current = null; }
   };
 
-  const send = useCallback(async (overrideInput?: string, inputState?: string, setInput?: (v: string) => void, imageUrls?: string[]) => {
+  const send = useCallback(async (overrideInput?: string, inputState?: string, setInput?: (v: string) => void, attachments?: ChatAttachment[]) => {
     const text = (overrideInput || inputState || "").trim();
-    if (!text && (!imageUrls || imageUrls.length === 0)) return;
+    if (!text && (!attachments || attachments.length === 0)) return;
     if (isStreaming) return;
-    const validation = messageSchema.safeParse(text);
-    if (!validation.success) { toast.error(validation.error.errors[0].message); return; }
-    // Build content with optional images prepended as markdown
-    let displayContent = text;
-    if (imageUrls && imageUrls.length > 0) {
-      const imageMarkdown = imageUrls.map((url) => `![image](${url})`).join("\n");
-      displayContent = imageMarkdown + (text ? "\n\n" + text : "");
+    if (text) {
+      const validation = messageSchema.safeParse(text);
+      if (!validation.success) { toast.error(validation.error.errors[0].message); return; }
     }
-    const userMsg: Msg = { role: "user", content: displayContent };
+    const userMsg: Msg = { role: "user", content: text, attachments: attachments?.length ? attachments : undefined };
     if (!overrideInput && setInput) setInput("");
     let convId = activeConv;
     if (!convId) { convId = await createConversation(model, personalityId); if (!convId) return; }
-    if (user) await supabase.from("messages").insert({ conversation_id: convId, role: "user", content: userMsg.content });
+    if (user) {
+      await supabase.from("messages").insert({
+        conversation_id: convId,
+        role: "user",
+        content: userMsg.content,
+        attachments: userMsg.attachments ?? [],
+      } as any);
+    }
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     if (!user) saveLocalMessages(convId, allMessages);
@@ -133,21 +165,7 @@ export function useChatStreaming(
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      // Build API messages, converting image markdown to multimodal content
-      const apiMessages = allMessages.map((m) => {
-        if (m.role === "user" && m.content.includes("![image](")) {
-          const parts: any[] = [];
-          const imgRegex = /!\[image\]\(([^)]+)\)/g;
-          let match;
-          while ((match = imgRegex.exec(m.content)) !== null) {
-            parts.push({ type: "image_url", image_url: { url: match[1] } });
-          }
-          const textOnly = m.content.replace(/!\[image\]\([^)]+\)\n*/g, "").trim();
-          if (textOnly) parts.push({ type: "text", text: textOnly });
-          return { role: m.role, content: parts };
-        }
-        return m;
-      });
+      const apiMessages = allMessages.map(toApiMessage);
 
       const resp = await fetch(CHAT_URL, {
         method: "POST", headers: await buildHeaders(),
@@ -161,7 +179,7 @@ export function useChatStreaming(
       if (result) {
         if (user) await supabase.from("messages").insert({ conversation_id: convId, role: "assistant", content: result, model });
         if (allMessages.length === 1) {
-          const title = userMsg.content.slice(0, 60);
+          const title = (userMsg.content || userMsg.attachments?.[0]?.name || "New Chat").slice(0, 60);
           if (user) await supabase.from("conversations").update({ title }).eq("id", convId);
           setConversations((prev) => { const updated = prev.map((c) => (c.id === convId ? { ...c, title } : c)); if (!user) saveLocalConversations(updated); return updated; });
         }

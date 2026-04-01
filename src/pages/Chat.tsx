@@ -19,8 +19,8 @@ import { useTTS } from "@/hooks/useTTS";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import ChatMessages from "@/components/chat/ChatMessages";
 import ChatInput from "@/components/chat/ChatInput";
-import type { AttachedImage } from "@/components/chat/ChatInput";
-import { uploadChatImages } from "@/hooks/useImageUpload";
+import type { PendingAttachment } from "@/lib/chat-attachments";
+import { uploadChatAttachments } from "@/hooks/useImageUpload";
 import PersonalitySelector from "@/components/chat/PersonalitySelector";
 
 const VoiceAgent = lazy(() => import("@/components/chat/VoiceAgent"));
@@ -241,15 +241,15 @@ const Chat = () => {
             <ChatInput
               input={input}
               setInput={setInput}
-              onSend={async (images?: AttachedImage[]) => {
-                if (images && images.length > 0) {
+              onSend={async (attachments?: PendingAttachment[]) => {
+                if (attachments && attachments.length > 0) {
                   let convId = activeConv;
                   if (!convId) {
                     convId = await createConversation(model, personalityId);
                     if (!convId) return;
                   }
-                  const urls = await uploadChatImages(images, user, convId);
-                  send(undefined, input, setInput, urls);
+                  const uploadedAttachments = await uploadChatAttachments(attachments, user, convId);
+                  send(undefined, input, setInput, uploadedAttachments);
                 } else {
                   send(undefined, input, setInput);
                 }
@@ -257,6 +257,7 @@ const Chat = () => {
               isStreaming={isStreaming}
               enabledSkillIds={enabledSkillIds}
               skills={skills}
+              isGuest={isGuest}
               autoReadEnabled={autoReadEnabled}
               setAutoReadEnabled={setAutoReadEnabled}
             />
